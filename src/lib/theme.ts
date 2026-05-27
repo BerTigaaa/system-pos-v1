@@ -25,6 +25,10 @@ export const lightTheme: ThemeConfig = {
     Input: { controlHeight: 40 },
     Select: { controlHeight: 40 },
     Menu: { itemBorderRadius: 8, itemBg: "transparent" },
+    Form: {
+      itemMarginBottom: 20,
+      verticalLabelPadding: "0 0 6px",
+    },
   },
 };
 
@@ -53,5 +57,9 @@ export const darkTheme: ThemeConfig = {
     Input: { controlHeight: 40 },
     Select: { controlHeight: 40 },
     Menu: { itemBorderRadius: 8, itemBg: "transparent" },
+    Form: {
+      itemMarginBottom: 20,
+      verticalLabelPadding: "0 0 6px",
+    },
   },
 };

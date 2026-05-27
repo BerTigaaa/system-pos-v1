@@ -6,19 +6,32 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding database...");
 
-  // Create Developer
-  const devPassword = await bcrypt.hash("Admin@123", 12);
-  const developer = await prisma.user.create({
-    data: {
-      name: "Admin",
-      email: "admin@bertigapos.com",
-      password: devPassword,
-      role: "SUPER_ADMIN",
-      status: "ACTIVE",
-      isActive: true,
-    },
-  });
-  console.log("Developer created:", developer.email);
+  const password = await bcrypt.hash("password", 12);
+
+  // Create one account per role
+  const roles = [
+    { name: "Super Admin", email: "super_admin@bertigapos.local", role: "SUPER_ADMIN" as const },
+    { name: "Owner", email: "owner@bertigapos.local", role: "OWNER" as const },
+    { name: "Cashier", email: "cashier@bertigapos.local", role: "CASHIER" as const },
+    { name: "Warehouse", email: "warehouse@bertigapos.local", role: "WAREHOUSE" as const },
+    { name: "Finance", email: "finance@bertigapos.local", role: "FINANCE" as const },
+  ];
+
+  for (const user of roles) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {},
+      create: {
+        name: user.name,
+        email: user.email,
+        password,
+        role: user.role,
+        status: "ACTIVE",
+        isActive: true,
+      },
+    });
+    console.log(`${user.role} created: ${user.email} / password`);
+  }
 
   // Create Business Info
   await prisma.businessInfo.create({
@@ -29,37 +42,6 @@ async function main() {
       email: "owner@demo.com",
     },
   });
-
-  // Create Owner Demo
-  const ownerPassword = await bcrypt.hash("Owner@123", 12);
-  const owner = await prisma.user.create({
-    data: {
-      name: "Budi Santoso",
-      email: "owner@demo.com",
-      password: ownerPassword,
-      role: "OWNER",
-      status: "ACTIVE",
-      isActive: true,
-    },
-  });
-  console.log("Owner created:", owner.email);
-
-  // Create 5 Cashiers
-  const cashierPassword = await bcrypt.hash("Kasir@123", 12);
-  const cashierNames = ["Siti", "Rina", "Ahmad", "Dewi", "Bagus"];
-  for (const name of cashierNames) {
-    await prisma.user.create({
-      data: {
-        name,
-        email: `kasir${name.toLowerCase()}@demo.com`,
-        password: cashierPassword,
-        role: "CASHIER",
-        status: "ACTIVE",
-        isActive: true,
-      },
-    });
-  }
-  console.log("Cashiers created:", cashierNames.length);
 
   // Default Cash Flow Categories
   const cashInCategories = ["Penjualan", "Modal", "Pinjaman", "Lain-lain"];
@@ -73,13 +55,17 @@ async function main() {
   ];
 
   for (const name of cashInCategories) {
-    await prisma.cashFlowCategory.create({
-      data: { name, type: "IN", isDefault: true },
+    await prisma.cashFlowCategory.upsert({
+      where: { name_type: { name, type: "IN" } },
+      update: {},
+      create: { name, type: "IN", isDefault: true },
     });
   }
   for (const name of cashOutCategories) {
-    await prisma.cashFlowCategory.create({
-      data: { name, type: "OUT", isDefault: true },
+    await prisma.cashFlowCategory.upsert({
+      where: { name_type: { name, type: "OUT" } },
+      update: {},
+      create: { name, type: "OUT", isDefault: true },
     });
   }
   console.log("Cash flow categories created");
@@ -91,14 +77,15 @@ async function main() {
     { key: "invoice_prefix", value: "INV" },
     { key: "receipt_paper_size", value: "80" },
     { key: "receipt_show_logo", value: "true" },
-    {
-      key: "receipt_footer",
-      value: "Terima kasih atas kunjungan Anda!",
-    },
+    { key: "receipt_footer", value: "Terima kasih atas kunjungan Anda!" },
   ];
 
   for (const setting of defaultSettings) {
-    await prisma.setting.create({ data: setting });
+    await prisma.setting.upsert({
+      where: { key: setting.key },
+      update: {},
+      create: setting,
+    });
   }
   console.log("Default settings created");
 

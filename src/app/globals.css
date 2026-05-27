@@ -35,3 +35,63 @@ body {
 .dark ::-webkit-scrollbar-thumb {
   background: #475569;
 }
+
+/* ── Form validation ── */
+.ant-form-item {
+  --error-color: #ef4444;
+}
+
+.ant-form-item-explain-error {
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-top: 2px;
+  color: var(--error-color) !important;
+}
+
+.ant-form-item-explain-error::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: var(--error-color);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ant-form-item-has-error .ant-input,
+.ant-form-item-has-error .ant-input-password,
+.ant-form-item-has-error .ant-input-affix-wrapper {
+  border-color: var(--error-color) !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.08) !important;
+}
+
+.ant-form-item-has-error .ant-input:hover,
+.ant-form-item-has-error .ant-input-password:hover,
+.ant-form-item-has-error .ant-input-affix-wrapper:hover {
+  border-color: #dc2626 !important;
+}
+
+.ant-form-item-has-error .ant-input:focus,
+.ant-form-item-has-error .ant-input-password:focus,
+.ant-form-item-has-error .ant-input-affix-wrapper:focus {
+  border-color: var(--error-color) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+.ant-form-item-explain {
+  animation: fadeSlideDown 0.2s ease-out;
+}
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
