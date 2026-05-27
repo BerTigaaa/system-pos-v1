@@ -14,6 +14,7 @@ import {
   BarChartOutlined,
   SettingOutlined,
   SafetyCertificateOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -22,6 +23,7 @@ import { useUIStore } from "@/store/ui-store";
 const menuItems = [
   { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard", module: "dashboard" },
   { key: "/pos", icon: <ShoppingCartOutlined />, label: "POS", module: "pos" },
+  { key: "/shifts", icon: <ClockCircleOutlined />, label: "Shift", module: "shifts" },
   { key: "/products", icon: <AppstoreOutlined />, label: "Produk", module: "products" },
   { key: "/inventory", icon: <BuildOutlined />, label: "Gudang", module: "inventory" },
   { key: "/customers", icon: <TeamOutlined />, label: "Pelanggan", module: "customers" },

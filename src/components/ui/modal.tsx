@@ -10,7 +10,7 @@ export type AppModalProps = ModalProps & {
 export function AppModal({ loading, children, ...props }: AppModalProps) {
   return (
     <AntModal
-      destroyOnClose
+      destroyOnHidden
       confirmLoading={loading}
       {...props}
     >

@@ -1,6 +1,6 @@
 import { UserRole } from "@prisma/client";
 
-export type ModuleAction = "view" | "create" | "edit" | "delete";
+export type ModuleAction = "view" | "create" | "edit" | "delete" | "close";
 
 type PermissionMap = Record<string, UserRole[]>;
 
@@ -63,8 +63,8 @@ const modulePermissions: Record<string, PermissionMap> = {
   },
   shifts: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    close: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    create: ["SUPER_ADMIN", "OWNER"],
+    close: ["SUPER_ADMIN", "OWNER"],
   },
   admin: {
     view: ["SUPER_ADMIN"],

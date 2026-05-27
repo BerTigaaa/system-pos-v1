@@ -10,7 +10,7 @@ export type AppDrawerProps = DrawerProps & {
 export function AppDrawer({ loading, children, ...props }: AppDrawerProps) {
   return (
     <AntDrawer
-      destroyOnClose
+      destroyOnHidden
       loading={loading}
       {...props}
     >

@@ -85,13 +85,23 @@ body {
   animation: fadeSlideDown 0.2s ease-out;
 }
 
+.ant-message {
+  top: auto !important;
+  bottom: 24px;
+  left: auto !important;
+  right: 24px;
+  transform: none !important;
+}
+
+@media (max-width: 640px) {
+  .ant-message {
+    right: 12px;
+    left: 12px !important;
+    bottom: 12px;
+  }
+}
+
 @keyframes fadeSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
