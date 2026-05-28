@@ -34,14 +34,32 @@ async function main() {
   }
 
   // Create Business Info
-  await prisma.businessInfo.create({
-    data: {
+  const bizInfo = await prisma.businessInfo.upsert({
+    where: { id: "default" },
+    update: {
+      name: "Toko Demo BertigaPos",
+      selfOrderEnabled: true,
+      totalTables: 10,
+    },
+    create: {
+      id: "default",
       name: "Toko Demo BertigaPos",
       ownerName: "Budi Santoso",
       phone: "081234567890",
       email: "owner@demo.com",
+      selfOrderEnabled: true,
+      totalTables: 10,
     },
   });
+
+  // Create dining tables
+  for (let i = 1; i <= 10; i++) {
+    await prisma.diningTable.upsert({
+      where: { businessInfoId_tableNumber: { businessInfoId: bizInfo.id, tableNumber: i } },
+      update: {},
+      create: { businessInfoId: bizInfo.id, tableNumber: i },
+    });
+  }
 
   // Default Cash Flow Categories
   const cashInCategories = ["Penjualan", "Modal", "Pinjaman", "Lain-lain"];

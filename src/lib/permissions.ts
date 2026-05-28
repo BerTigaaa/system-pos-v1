@@ -24,12 +24,6 @@ const modulePermissions: Record<string, PermissionMap> = {
     edit: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
     delete: ["SUPER_ADMIN", "OWNER"],
   },
-  customers: {
-    view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    edit: ["SUPER_ADMIN", "OWNER"],
-    delete: ["SUPER_ADMIN", "OWNER"],
-  },
   transactions: {
     view: ["SUPER_ADMIN", "OWNER", "FINANCE", "CASHIER"],
     create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
@@ -65,6 +59,15 @@ const modulePermissions: Record<string, PermissionMap> = {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
     create: ["SUPER_ADMIN", "OWNER"],
     close: ["SUPER_ADMIN", "OWNER"],
+  },
+  orders: {
+    view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    edit: ["SUPER_ADMIN", "OWNER"],
+  },
+  selfOrder: {
+    view: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN"],
   },
   admin: {
     view: ["SUPER_ADMIN"],

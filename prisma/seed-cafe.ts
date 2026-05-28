@@ -72,36 +72,22 @@ async function main() {
   }
   console.log(`✅ ${productData.length} products`);
 
-  // ===== CUSTOMERS =====
-  const customerData = [
-    { name: "Rina Wijaya", phone: "081234567891", email: "rina@email.com", address: "Jl. Merdeka No. 1" },
-    { name: "Andi Pratama", phone: "081234567892", email: "andi@email.com", address: "Jl. Sudirman No. 5" },
-    { name: "Sari Dewi", phone: "081234567893", email: "sari@email.com", address: "Jl. Gatot Subroto No. 10" },
-    { name: "Budi Hartono", phone: "081234567894", email: null, address: "Jl. Diponegoro No. 3" },
-    { name: "Maya Anggraini", phone: "081234567895", email: "maya@email.com", address: "Jl. Thamrin No. 8" },
-    { name: "Dimas Putra", phone: "081234567896", email: null, address: null },
-    { name: "Lisa Kusuma", phone: "081234567897", email: "lisa@email.com", address: "Jl. Kuningan No. 15" },
-    { name: "Rudi Hermawan", phone: "081234567898", email: "rudi@email.com", address: "Jl. Rasuna Said No. 20" },
+  // ===== TRANSACTIONS for yesterday's shift =====
+  const customerNames = [
+    "Rina Wijaya", "Andi Pratama", "Sari Dewi", "Budi Hartono",
+    "Maya Anggraini", "Dimas Putra", "Lisa Kusuma", "Rudi Hermawan",
   ];
 
-  const customers: { id: string; name: string }[] = [];
-  for (const c of customerData) {
-    const created = await prisma.customer.upsert({
-      where: { phone: c.phone },
-      update: {},
-      create: {
-        name: c.name,
-        phone: c.phone,
-        email: c.email,
-        address: c.address,
-        isActive: true,
-      },
-    });
-    customers.push({ id: created.id, name: created.name });
-  }
-  console.log(`✅ ${customerData.length} customers`);
-
-  // ===== SUPPLIERS =====
+  const trxData = [
+    { inv: "INV-20260526-001", time: 9, customer: 0, items: [0, 2], qty: [1, 1], method: "CASH" },
+    { inv: "INV-20260526-002", time: 10, customer: 1, items: [1, 15], qty: [2, 1], method: "QRIS" },
+    { inv: "INV-20260526-003", time: 11, customer: 2, items: [3, 0], qty: [1, 1], method: "CASH" },
+    { inv: "INV-20260526-004", time: 12, customer: null, items: [4, 16, 7], qty: [1, 1, 1], method: "CASH" },
+    { inv: "INV-20260526-005", time: 13, customer: 3, items: [5, 11], qty: [2, 1], method: "QRIS" },
+    { inv: "INV-20260526-006", time: 14, customer: 4, items: [6, 8, 20], qty: [1, 2, 1], method: "CASH" },
+    { inv: "INV-20260526-007", time: 15, customer: null, items: [12, 17], qty: [1, 1], method: "CASH" },
+    { inv: "INV-20260526-008", time: 16, customer: 5, items: [9, 13, 18], qty: [1, 2, 1], method: "QRIS" },
+  ];
   const supplierData = [
     { name: "PT Kopi Nusantara", phone: "021-5550011", email: "sales@kopinusantara.com", address: "Jakarta Pusat" },
     { name: "CV Segar Abadi", phone: "021-5550022", email: "order@segarabadi.com", address: "Jakarta Selatan" },
@@ -173,18 +159,6 @@ async function main() {
   });
   console.log(`✅ Today's active shift created`);
 
-  // ===== TRANSACTIONS for yesterday's shift =====
-  const trxData = [
-    { inv: "INV-20260526-001", time: 9, customer: 0, items: [0, 2], qty: [1, 1], method: "CASH" },
-    { inv: "INV-20260526-002", time: 10, customer: 1, items: [1, 15], qty: [2, 1], method: "QRIS" },
-    { inv: "INV-20260526-003", time: 11, customer: 2, items: [3, 0], qty: [1, 1], method: "CASH" },
-    { inv: "INV-20260526-004", time: 12, customer: null, items: [4, 16, 7], qty: [1, 1, 1], method: "CASH" },
-    { inv: "INV-20260526-005", time: 13, customer: 3, items: [5, 11], qty: [2, 1], method: "QRIS" },
-    { inv: "INV-20260526-006", time: 14, customer: 4, items: [6, 8, 20], qty: [1, 2, 1], method: "CASH" },
-    { inv: "INV-20260526-007", time: 15, customer: null, items: [12, 17], qty: [1, 1], method: "CASH" },
-    { inv: "INV-20260526-008", time: 16, customer: 5, items: [9, 13, 18], qty: [1, 2, 1], method: "QRIS" },
-  ];
-
   let totalTrx = 0;
   for (const t of trxData) {
     const trxTime = new Date(yesterday);
@@ -227,7 +201,7 @@ async function main() {
         invoiceNumber: t.inv,
         shiftId: closedShift.id,
         cashierId: cashier.id,
-        customerId: t.customer !== null ? customers[t.customer]?.id : null,
+        customerName: t.customer !== null ? customerNames[t.customer] : null,
         status: "COMPLETED",
         subtotal,
         discountAmount: 0,
@@ -245,17 +219,6 @@ async function main() {
         },
       },
     });
-
-    // Update customer totalSpent
-    if (t.customer !== null) {
-      await prisma.customer.update({
-        where: { id: customers[t.customer].id },
-        data: {
-          totalSpent: { increment: total },
-          totalOrders: { increment: 1 },
-        },
-      });
-    }
 
     totalTrx++;
   }

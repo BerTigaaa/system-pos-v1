@@ -10,7 +10,6 @@ type Tx = {
   status: string;
   createdAt: Date;
   cashier: { name: string };
-  customer: { name: string } | null;
 };
 
 export function RecentTransactions() {

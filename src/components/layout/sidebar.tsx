@@ -4,17 +4,14 @@ import { useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "antd";
 import {
-  DashboardOutlined,
-  ShoppingCartOutlined,
-  AppstoreOutlined,
+  DashboardOutlined, ShoppingCartOutlined,
+  ClockCircleOutlined, AppstoreOutlined,
   BuildOutlined,
-  TeamOutlined,
   FileTextOutlined,
   BankOutlined,
   BarChartOutlined,
   SettingOutlined,
   SafetyCertificateOutlined,
-  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -26,7 +23,6 @@ const menuItems = [
   { key: "/shifts", icon: <ClockCircleOutlined />, label: "Shift", module: "shifts" },
   { key: "/products", icon: <AppstoreOutlined />, label: "Produk", module: "products" },
   { key: "/inventory", icon: <BuildOutlined />, label: "Gudang", module: "inventory" },
-  { key: "/customers", icon: <TeamOutlined />, label: "Pelanggan", module: "customers" },
   { key: "/transactions", icon: <FileTextOutlined />, label: "Transaksi", module: "transactions" },
   { key: "/finance", icon: <BankOutlined />, label: "Keuangan", module: "finance" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Laporan", module: "reports" },

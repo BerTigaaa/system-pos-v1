@@ -24,28 +24,29 @@ export type PosProduct = {
 
 type CartState = {
   items: CartItem[];
-  customerId: string | null;
-  customerName: string | null;
+  customerName: string;
   notes: string;
   discountPercent: number;
   paymentMethod: "CASH" | "QRIS" | "BANK_TRANSFER" | "DEBIT_CARD" | "CREDIT_CARD";
+  tableNumber: number | null;
   addItem: (product: PosProduct) => void;
   updateQuantity: (productId: string, qty: number) => void;
   removeItem: (productId: string) => void;
-  setCustomer: (id: string | null, name: string | null) => void;
+  setCustomerName: (name: string) => void;
   setNotes: (notes: string) => void;
   setDiscountPercent: (pct: number) => void;
   setPaymentMethod: (method: CartState["paymentMethod"]) => void;
+  setTableNumber: (num: number | null) => void;
   clearCart: () => void;
 };
 
 export const useCartStore = create<CartState>((set) => ({
   items: [],
-  customerId: null,
-  customerName: null,
+  customerName: "",
   notes: "",
   discountPercent: 0,
   paymentMethod: "CASH",
+  tableNumber: null,
 
   addItem: (product) =>
     set((state) => {
@@ -96,17 +97,18 @@ export const useCartStore = create<CartState>((set) => ({
       items: state.items.filter((i) => i.productId !== productId),
     })),
 
-  setCustomer: (id, name) => set({ customerId: id, customerName: name }),
+  setCustomerName: (name) => set({ customerName: name }),
   setNotes: (notes) => set({ notes }),
   setDiscountPercent: (pct) => set({ discountPercent: Math.max(0, Math.min(100, pct)) }),
   setPaymentMethod: (method) => set({ paymentMethod: method }),
+  setTableNumber: (num) => set({ tableNumber: num }),
   clearCart: () =>
     set({
       items: [],
-      customerId: null,
-      customerName: null,
+      customerName: "",
       notes: "",
       discountPercent: 0,
       paymentMethod: "CASH",
+      tableNumber: null,
     }),
 }));

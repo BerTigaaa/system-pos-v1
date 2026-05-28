@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DollarOutlined, ShoppingCartOutlined, RiseOutlined, TeamOutlined } from "@ant-design/icons";
+import { DollarOutlined, ShoppingCartOutlined, RiseOutlined } from "@ant-design/icons";
 import { useSession } from "next-auth/react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
@@ -17,7 +17,6 @@ export default function DashboardPage() {
     todayTransactions: number;
     totalSales: number;
     totalProducts: number;
-    totalCustomers: number;
     lowStockList: { id: string; name: string; sku: string; stock: number; min_stock: number }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,13 +62,6 @@ export default function DashboardPage() {
           value={stats?.totalProducts ?? 0}
           icon={<RiseOutlined />}
           color="linear-gradient(135deg, #F59E0B, #D97706)"
-          loading={loading}
-        />
-        <StatCard
-          title="Pelanggan"
-          value={stats?.totalCustomers ?? 0}
-          icon={<TeamOutlined />}
-          color="linear-gradient(135deg, #8B5CF6, #7C3AED)"
           loading={loading}
         />
       </div>

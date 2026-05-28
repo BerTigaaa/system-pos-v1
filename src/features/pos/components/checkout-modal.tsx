@@ -18,19 +18,39 @@ export function CheckoutModal({
   open,
   onClose,
   onSuccess,
+  items: propItems,
+  customerName: propCustomerName,
+  tableNumber: propTableNumber,
+  orderIds = [],
 }: {
   open: boolean;
   onClose: () => void;
   onSuccess: (data: { id: string; invoiceNumber: string }) => void;
+  items?: { productId: string; name: string; sku: string; quantity: number; sellPrice: number }[];
+  customerName?: string;
+  tableNumber?: number | null;
+  orderIds?: string[];
 }) {
-  const { items, customerId, discountPercent, paymentMethod, setPaymentMethod } = useCartStore();
+  const storeItems = useCartStore((s) => s.items);
+  const storeCustomerName = useCartStore((s) => s.customerName);
+  const storePaymentMethod = useCartStore((s) => s.paymentMethod);
+  const storeDiscount = useCartStore((s) => s.discountPercent);
+  const storeTableNumber = useCartStore((s) => s.tableNumber);
+  const setPaymentMethod = useCartStore((s) => s.setPaymentMethod);
+
+  const items = propItems ?? storeItems;
+  const customerName = propCustomerName ?? storeCustomerName;
+  const currentTable = propTableNumber ?? storeTableNumber;
+  const discountPercent = storeDiscount;
+  const paymentMethod = storePaymentMethod;
+
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
   const paidAmount = Form.useWatch("paidAmount", form);
 
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.sellPrice * i.quantity, 0), [items]);
-  const discAmount = useMemo(() => (discountPercent > 0 ? subtotal * (discountPercent / 100) : 0), [items, discountPercent, subtotal]);
+  const discAmount = useMemo(() => (discountPercent > 0 ? subtotal * (discountPercent / 100) : 0), [discountPercent, subtotal]);
   const total = useMemo(() => subtotal - discAmount, [subtotal, discAmount]);
   const isCash = paymentMethod === "CASH";
   const change = isCash && paidAmount >= total ? paidAmount - total : 0;
@@ -47,7 +67,7 @@ export function CheckoutModal({
         name: i.name,
         sku: i.sku,
       })),
-      customerId,
+      customerName: customerName || undefined,
       discountPercent,
       payments: [
         {
@@ -59,6 +79,8 @@ export function CheckoutModal({
       subtotal,
       totalDiscount: discAmount,
       total,
+      tableNumber: currentTable,
+      orderIds: orderIds,
     };
 
     const res = await checkout(payload);

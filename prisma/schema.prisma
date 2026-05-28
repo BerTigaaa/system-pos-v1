@@ -106,10 +106,28 @@ model BusinessInfo {
   email       String?
   logoUrl     String?  @map("logo_url")
   npwp        String?
+  selfOrderEnabled Boolean @default(false) @map("self_order_enabled")
+  totalTables Int     @default(0) @map("total_tables")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  diningTables DiningTable[]
+
   @@map("business_info")
+}
+
+model DiningTable {
+  id          String   @id @default(uuid())
+  businessInfoId String @map("business_info_id")
+  tableNumber Int      @map("table_number")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  businessInfo BusinessInfo @relation(fields: [businessInfoId], references: [id], onDelete: Cascade)
+
+  @@unique([businessInfoId, tableNumber])
+  @@map("dining_tables")
 }
 
 model Category {
@@ -147,6 +165,7 @@ model Product {
   transactionItems  TransactionItem[]
   inventoryMovements InventoryMovement[]
   stockOpnameItems  StockOpnameItem[]
+  orderItems        OrderItem[]
 
   @@index([isActive])
   @@index([categoryId])
@@ -169,24 +188,7 @@ model Supplier {
   @@map("suppliers")
 }
 
-model Customer {
-  id           String    @id @default(uuid())
-  name         String
-  phone        String    @unique
-  email        String?
-  address      String?
-  notes        String?
-  totalSpent   Decimal   @default(0) @map("total_spent") @db.Decimal(12, 2)
-  totalOrders  Int       @default(0) @map("total_orders")
-  isActive     Boolean   @default(true) @map("is_active")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
 
-  transactions  Transaction[]
-
-  @@map("customers")
-}
 
 model Shift {
   id              String      @id @default(uuid())
@@ -207,6 +209,7 @@ model Shift {
 
   user          User          @relation(fields: [userId], references: [id])
   transactions  Transaction[]
+  orders        Order[]
 
   @@index([userId, status])
   @@map("shifts")
@@ -217,7 +220,7 @@ model Transaction {
   invoiceNumber   String            @unique @map("invoice_number")
   shiftId         String?           @map("shift_id")
   cashierId       String            @map("cashier_id")
-  customerId      String?           @map("customer_id")
+  customerName    String?           @map("customer_name")
   status          TransactionStatus @default(COMPLETED)
   subtotal        Decimal           @db.Decimal(12, 2)
   discountAmount  Decimal           @default(0) @map("discount_amount") @db.Decimal(12, 2)
@@ -225,18 +228,17 @@ model Transaction {
   taxAmount       Decimal           @default(0) @map("tax_amount") @db.Decimal(12, 2)
   total           Decimal           @db.Decimal(12, 2)
   notes           String?
+  tableNumber     Int?              @map("table_number")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
   shift             Shift?             @relation(fields: [shiftId], references: [id])
   cashier           User               @relation("CashierTransactions", fields: [cashierId], references: [id])
-  customer          Customer?          @relation(fields: [customerId], references: [id])
   items             TransactionItem[]
   payments          TransactionPayment[]
   refunds           Refund[]
 
   @@index([cashierId])
-  @@index([customerId])
   @@index([createdAt])
   @@index([status])
   @@map("transactions")
@@ -429,6 +431,50 @@ model AuditLog {
   @@index([createdAt])
   @@index([userId])
   @@map("audit_logs")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  tableNumber  Int         @map("table_number")
+  customerName String      @map("customer_name")
+  notes        String?
+  status       OrderStatus @default(PENDING)
+  total        Decimal     @db.Decimal(12, 2)
+
+  items   OrderItem[]
+  shiftId String?   @map("shift_id")
+  shift   Shift?    @relation(fields: [shiftId], references: [id])
+
+  paidAt     DateTime? @map("paid_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([shiftId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  orderId     String  @map("order_id")
+  productId   String  @map("product_id")
+  productName String  @map("product_name")
+  quantity    Int
+  sellPrice   Decimal @db.Decimal(12, 2) @map("sell_price")
+  subtotal    Decimal @db.Decimal(12, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
 }
 
 model Notification {
