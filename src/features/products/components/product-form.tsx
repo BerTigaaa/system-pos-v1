@@ -87,14 +87,12 @@ export function ProductForm({ initial, onSuccess, onCancel }: Props) {
           <Select options={[{ value: "pcs", label: "Pcs" }, { value: "kg", label: "Kg" }, { value: "liter", label: "Liter" }, { value: "box", label: "Box" }]} />
         </Form.Item>
       </div>
-      <div className="flex gap-3">
-        <Form.Item name="buyPrice" label="Harga Beli" className="flex-1" rules={[{ required: true, message: "Wajib diisi" }]}>
-          <InputNumber className="!w-full" min={0} prefix="Rp" />
-        </Form.Item>
-        <Form.Item name="sellPrice" label="Harga Jual" className="flex-1" rules={[{ required: true, message: "Wajib diisi" }]}>
-          <InputNumber className="!w-full" min={0} prefix="Rp" />
-        </Form.Item>
-      </div>
+      <Form.Item name="buyPrice" label="Harga Beli" rules={[{ required: true, message: "Wajib diisi" }]}>
+        <InputNumber className="!w-full" min={0} prefix="Rp" />
+      </Form.Item>
+      <Form.Item name="sellPrice" label="Harga Jual" rules={[{ required: true, message: "Wajib diisi" }]}>
+        <InputNumber className="!w-full" min={0} prefix="Rp" />
+      </Form.Item>
       <div className="flex gap-3">
         <Form.Item name="stock" label="Stok Awal" className="flex-1">
           <InputNumber className="!w-full" min={0} />

@@ -65,7 +65,22 @@ enum NotificationType {
   REFUND_SUCCESS
   STOCK_ADJUSTED
   PRODUCT_ADDED
+  PRODUCT_DELETED
+  PRODUCT_STATUS_CHANGED
+  STOCK_OPNAME_CREATED
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  CASH_FLOW_CREATED
+  CASH_FLOW_DELETED
   SETTINGS_CHANGED
+  EMPLOYEE_CREATED
+  EMPLOYEE_STATUS_CHANGED
+  EMPLOYEE_PASSWORD_RESET
+  USER_STATUS_CHANGED
+  USER_ROLE_CHANGED
+  SUPPLIER_CREATED
+  SUPPLIER_UPDATED
+  SUPPLIER_DELETED
   NEW_LOGIN
 }
 
@@ -92,6 +107,7 @@ model User {
   inventoryMovements InventoryMovement[]
   cashFlows     CashFlow[]
   stockOpnames  StockOpname[]
+  processedRefunds Refund[]
 
   @@index([email])
   @@map("users")
@@ -126,6 +142,7 @@ model DiningTable {
 
   businessInfo BusinessInfo @relation(fields: [businessInfoId], references: [id], onDelete: Cascade)
 
+  @@index([businessInfoId])
   @@unique([businessInfoId, tableNumber])
   @@map("dining_tables")
 }
@@ -212,6 +229,7 @@ model Shift {
   orders        Order[]
 
   @@index([userId, status])
+  @@index([openedAt])
   @@map("shifts")
 }
 
@@ -241,6 +259,7 @@ model Transaction {
   @@index([cashierId])
   @@index([createdAt])
   @@index([status])
+  @@index([shiftId])
   @@map("transactions")
 }
 
@@ -291,9 +310,11 @@ model Refund {
   createdAt       DateTime @default(now()) @map("created_at")
 
   transaction     Transaction  @relation(fields: [transactionId], references: [id])
+  processedBy     User         @relation(fields: [processedById], references: [id])
   items           RefundItem[]
 
   @@index([transactionId])
+  @@index([processedById])
   @@map("refunds")
 }
 
@@ -309,6 +330,7 @@ model RefundItem {
   transactionItem     TransactionItem @relation(fields: [transactionItemId], references: [id])
 
   @@index([refundId])
+  @@index([transactionItemId])
   @@map("refund_items")
 }
 
@@ -335,6 +357,8 @@ model InventoryMovement {
   @@index([productId])
   @@index([type])
   @@index([createdAt])
+  @@index([userId])
+  @@index([supplierId])
   @@map("inventory_movements")
 }
 
@@ -349,6 +373,7 @@ model StockOpname {
   user          User             @relation(fields: [userId], references: [id])
   items         StockOpnameItem[]
 
+  @@index([userId])
   @@map("stock_opnames")
 }
 
@@ -366,6 +391,7 @@ model StockOpnameItem {
   product       Product     @relation(fields: [productId], references: [id])
 
   @@index([opnameId])
+  @@index([productId])
   @@map("stock_opname_items")
 }
 
@@ -400,6 +426,8 @@ model CashFlow {
 
   @@index([type])
   @@index([date])
+  @@index([userId])
+  @@index([categoryId])
   @@map("cash_flows")
 }
 
@@ -458,6 +486,7 @@ model Order {
 
   @@index([status])
   @@index([shiftId])
+  @@index([tableNumber])
   @@map("orders")
 }
 
@@ -474,6 +503,7 @@ model OrderItem {
   product Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 

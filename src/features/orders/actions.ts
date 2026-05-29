@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { notifyRole } from "@/lib/notifications";
 import { createOrderSchema } from "./types";
 
 export async function getBusinessInfo() {
@@ -65,6 +67,13 @@ export async function createOrder(formData: FormData) {
 
   const { tableNumber, customerName, notes } = parsed.data;
 
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, name: true, stock: true },
+  });
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
   let total = 0;
   const orderItemsData: {
     productId: string;
@@ -75,7 +84,7 @@ export async function createOrder(formData: FormData) {
   }[] = [];
 
   for (const item of items) {
-    const product = await prisma.product.findUnique({ where: { id: item.productId } });
+    const product = productMap.get(item.productId);
     if (!product || product.stock < item.quantity) {
       return { success: false, error: { message: `Stok ${product?.name ?? "produk"} tidak mencukupi` } };
     }
@@ -90,7 +99,7 @@ export async function createOrder(formData: FormData) {
     });
   }
 
-  await prisma.order.create({
+  const order = await prisma.order.create({
     data: {
       tableNumber,
       customerName,
@@ -99,6 +108,13 @@ export async function createOrder(formData: FormData) {
       shiftId: activeShift.id,
       items: { create: orderItemsData },
     },
+  });
+
+  await notifyRole(["CASHIER", "OWNER"], {
+    type: "ORDER_CREATED",
+    title: "Pesanan Mandiri Baru",
+    message: `Pesanan dari meja ${tableNumber} (${customerName}) — Rp ${total.toLocaleString("id")}.`,
+    data: { orderId: order.id, tableNumber, customerName, total },
   });
 
   revalidatePath("/orders");
@@ -151,6 +167,13 @@ export async function updateOrderItems(
   if (!order) return { success: false, error: { message: "Order tidak ditemukan" } };
   if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah dikonfirmasi, tidak bisa diubah" } };
 
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, name: true },
+  });
+  const productMap = new Map(products.map((p) => [p.id, p.name]));
+
   let total = 0;
   const orderItemsData: {
     productId: string;
@@ -161,13 +184,13 @@ export async function updateOrderItems(
   }[] = [];
 
   for (const item of items) {
-    const product = await prisma.product.findUnique({ where: { id: item.productId } });
-    if (!product) return { success: false, error: { message: `Produk tidak ditemukan` } };
+    const productName = productMap.get(item.productId);
+    if (!productName) return { success: false, error: { message: `Produk tidak ditemukan` } };
     const subtotal = item.sellPrice * item.quantity;
     total += subtotal;
     orderItemsData.push({
       productId: item.productId,
-      productName: product.name,
+      productName,
       quantity: item.quantity,
       sellPrice: item.sellPrice,
       subtotal,
@@ -188,6 +211,8 @@ export async function updateOrderItems(
 export async function getOrders(params: { status?: string; page?: number; pageSize?: number }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0 };
+  if (!hasPermission(session.user.role, "orders", "view"))
+    return { success: false, error: { message: "Forbidden" }, data: [], total: 0 };
 
   const { status, page = 1, pageSize = 20 } = params;
   const where: Record<string, unknown> = {};
@@ -218,22 +243,33 @@ export async function getOrders(params: { status?: string; page?: number; pageSi
 export async function confirmOrder(orderId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "orders", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { success: false, error: { message: "Order tidak ditemukan" } };
   if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah diproses" } };
 
   await prisma.$transaction(async (tx) => {
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      });
-    }
+    await Promise.all(
+      order.items.map((item) =>
+        tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        })
+      )
+    );
     await tx.order.update({
       where: { id: orderId },
       data: { status: "CONFIRMED" },
     });
+  });
+
+  await notifyRole(["OWNER"], {
+    type: "ORDER_STATUS_CHANGED",
+    title: "Pesanan Dikonfirmasi",
+    message: `Pesanan meja ${order.tableNumber} (${order.customerName}) telah dikonfirmasi — Rp ${Number(order.total).toLocaleString("id")}.`,
+    data: { orderId, tableNumber: order.tableNumber, customerName: order.customerName, status: "CONFIRMED" },
   });
 
   revalidatePath("/orders");
@@ -243,6 +279,8 @@ export async function confirmOrder(orderId: string) {
 export async function completeOrder(orderId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "orders", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { success: false, error: { message: "Order tidak ditemukan" } };
@@ -256,6 +294,8 @@ export async function completeOrder(orderId: string) {
 export async function cancelOrder(orderId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "orders", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { success: false, error: { message: "Order tidak ditemukan" } };

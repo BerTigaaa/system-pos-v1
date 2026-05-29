@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { notifyRole } from "@/lib/notifications";
 
 export async function getPosProducts(params: {
   search?: string;
@@ -60,6 +62,8 @@ export async function createPosOrder(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "pos", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const activeShift = await prisma.shift.findFirst({
     where: { userId: session.user.id, status: "OPEN" },
@@ -68,6 +72,13 @@ export async function createPosOrder(data: {
 
   if (!data.items.length) return { success: false, error: { message: "Pilih minimal 1 item" } };
   if (!data.customerName.trim()) return { success: false, error: { message: "Nama pemesan wajib diisi" } };
+
+  const productIds = [...new Set(data.items.map((i) => i.productId))];
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, name: true },
+  });
+  const productMap = new Map(products.map((p) => [p.id, p.name]));
 
   let total = 0;
   const orderItemsData: {
@@ -79,20 +90,20 @@ export async function createPosOrder(data: {
   }[] = [];
 
   for (const item of data.items) {
-    const product = await prisma.product.findUnique({ where: { id: item.productId } });
-    if (!product) return { success: false, error: { message: `Produk tidak ditemukan` } };
+    const productName = productMap.get(item.productId);
+    if (!productName) return { success: false, error: { message: `Produk tidak ditemukan` } };
     const subtotal = item.sellPrice * item.quantity;
     total += subtotal;
     orderItemsData.push({
       productId: item.productId,
-      productName: product.name,
+      productName,
       quantity: item.quantity,
       sellPrice: item.sellPrice,
       subtotal,
     });
   }
 
-  await prisma.order.create({
+  const order = await prisma.order.create({
     data: {
       tableNumber: data.tableNumber,
       customerName: data.customerName,
@@ -101,6 +112,14 @@ export async function createPosOrder(data: {
       shiftId: activeShift.id,
       items: { create: orderItemsData },
     },
+    select: { id: true },
+  });
+
+  await notifyRole(["OWNER"], {
+    type: "ORDER_CREATED",
+    title: "Pesanan Baru",
+    message: `Pesanan dari meja ${data.tableNumber} (${data.customerName}) — Rp ${total.toLocaleString("id")}.`,
+    data: { orderId: order.id, tableNumber: data.tableNumber, customerName: data.customerName, total },
   });
 
   revalidatePath("/pos");
@@ -111,13 +130,14 @@ export async function getPosOrders() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [] };
 
-  const activeShift = await prisma.shift.findFirst({
-    where: { userId: session.user.id, status: "OPEN" },
+  const openShifts = await prisma.shift.findMany({
+    where: { status: "OPEN" },
+    select: { id: true },
   });
-  if (!activeShift) return { success: true, data: [] };
+  if (openShifts.length === 0) return { success: true, data: [] };
 
   const orders = await prisma.order.findMany({
-    where: { shiftId: activeShift.id, paidAt: null },
+    where: { shiftId: { in: openShifts.map((s) => s.id) }, paidAt: null },
     include: { items: true },
     orderBy: { createdAt: "desc" },
   });
@@ -148,13 +168,14 @@ export async function getPaidOrders() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [] };
 
-  const activeShift = await prisma.shift.findFirst({
-    where: { userId: session.user.id, status: "OPEN" },
+  const openShifts = await prisma.shift.findMany({
+    where: { status: "OPEN" },
+    select: { id: true },
   });
-  if (!activeShift) return { success: true, data: [] };
+  if (openShifts.length === 0) return { success: true, data: [] };
 
   const orders = await prisma.order.findMany({
-    where: { shiftId: activeShift.id, paidAt: { not: null } },
+    where: { shiftId: { in: openShifts.map((s) => s.id) }, paidAt: { not: null } },
     include: { items: true },
     orderBy: { createdAt: "desc" },
   });
@@ -186,13 +207,14 @@ export async function getCompletedOrdersByTable(tableNumber: number) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [] };
 
-  const activeShift = await prisma.shift.findFirst({
-    where: { userId: session.user.id, status: "OPEN" },
+  const openShifts = await prisma.shift.findMany({
+    where: { status: "OPEN" },
+    select: { id: true },
   });
-  if (!activeShift) return { success: true, data: [] };
+  if (openShifts.length === 0) return { success: true, data: [] };
 
   const orders = await prisma.order.findMany({
-    where: { shiftId: activeShift.id, tableNumber, status: "COMPLETED", paidAt: null },
+    where: { shiftId: { in: openShifts.map((s) => s.id) }, tableNumber, status: "COMPLETED", paidAt: null },
     include: { items: true },
     orderBy: { createdAt: "asc" },
   });
@@ -222,6 +244,8 @@ export async function getCompletedOrdersByTable(tableNumber: number) {
 export async function updatePosOrderStatus(orderId: string, status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED") {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "pos", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { success: false, error: { message: "Order tidak ditemukan" } };
@@ -229,13 +253,22 @@ export async function updatePosOrderStatus(orderId: string, status: "PENDING" | 
   if (status === "CONFIRMED") {
     if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah diproses" } };
     await prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        });
-      }
+      await Promise.all(
+        order.items.map((item) =>
+          tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          })
+        )
+      );
       await tx.order.update({ where: { id: orderId }, data: { status: "CONFIRMED" } });
+    });
+
+    await notifyRole(["OWNER"], {
+      type: "ORDER_STATUS_CHANGED",
+      title: "Pesanan Dikonfirmasi",
+      message: `Pesanan meja ${order.tableNumber} (${order.customerName}) telah dikonfirmasi — Rp ${Number(order.total).toLocaleString("id")}.`,
+      data: { orderId, tableNumber: order.tableNumber, status },
     });
   } else if (status === "COMPLETED") {
     if (order.status !== "CONFIRMED") return { success: false, error: { message: "Order belum dikonfirmasi" } };
@@ -243,6 +276,13 @@ export async function updatePosOrderStatus(orderId: string, status: "PENDING" | 
   } else if (status === "CANCELLED") {
     if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah diproses, tidak bisa dibatalkan" } };
     await prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+
+    await notifyRole(["OWNER"], {
+      type: "ORDER_STATUS_CHANGED",
+      title: "Pesanan Dibatalkan",
+      message: `Pesanan meja ${order.tableNumber} (${order.customerName}) telah dibatalkan.`,
+      data: { orderId, tableNumber: order.tableNumber, status },
+    });
   }
 
   revalidatePath("/pos");
@@ -253,13 +293,14 @@ export async function getTablesWithCompletedOrders() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [] };
 
-  const activeShift = await prisma.shift.findFirst({
-    where: { userId: session.user.id, status: "OPEN" },
+  const openShifts = await prisma.shift.findMany({
+    where: { status: "OPEN" },
+    select: { id: true },
   });
-  if (!activeShift) return { success: true, data: [] };
+  if (openShifts.length === 0) return { success: true, data: [] };
 
   const tables = await prisma.order.findMany({
-    where: { shiftId: activeShift.id, status: "COMPLETED", paidAt: null },
+    where: { shiftId: { in: openShifts.map((s) => s.id) }, status: "COMPLETED", paidAt: null },
     select: { tableNumber: true },
     distinct: ["tableNumber"],
     orderBy: { tableNumber: "asc" },
@@ -282,6 +323,8 @@ export async function checkout(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "pos", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   if (!data.items.length) return { success: false, error: { message: "Keranjang kosong" } };
 
@@ -292,7 +335,6 @@ export async function checkout(data: {
 
   const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
-  // Resolve random table
   let tableNumber = data.tableNumber ?? null;
   if (tableNumber === -1) {
     const biz = await prisma.businessInfo.findFirst();
@@ -326,18 +368,29 @@ export async function checkout(data: {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    // Skip stock deduction when paying from Bayar tab (already deducted on order confirm)
     if (!data.orderIds?.length) {
+      const productIds = [...new Set(data.items.map((i) => i.productId))];
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, name: true, stock: true },
+      });
+      const productMap = new Map(products.map((p) => [p.id, p]));
+
       for (const item of data.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const product = productMap.get(item.productId);
         if (!product || product.stock < item.quantity) {
           throw new Error(`Stok ${product?.name ?? "produk"} tidak mencukupi`);
         }
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        });
       }
+
+      await Promise.all(
+        data.items.map((item) =>
+          tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          })
+        )
+      );
     }
 
     const txData = {
@@ -386,7 +439,6 @@ export async function checkout(data: {
     return transaction;
   });
 
-  // Mark orders as paid
   if (data.orderIds?.length) {
     await prisma.order.updateMany({
       where: { id: { in: data.orderIds } },

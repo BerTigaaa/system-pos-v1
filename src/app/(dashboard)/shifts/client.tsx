@@ -47,6 +47,7 @@ export function ShiftsClient() {
         open={!!closeTarget}
         onCancel={() => { setCloseTarget(null); form.resetFields(); }}
         footer={null}
+        width={500}
         destroyOnHidden
       >
         <p className="text-sm text-gray-500 mb-4">
@@ -59,7 +60,7 @@ export function ShiftsClient() {
             rules={[{ required: true, message: "Masukkan saldo akhir" }]}
           >
             <InputNumber
-              className="w-full"
+              className="!w-full"
               min={0}
               prefix="Rp"
               placeholder="0"

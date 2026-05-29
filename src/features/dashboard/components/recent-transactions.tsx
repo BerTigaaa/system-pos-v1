@@ -36,7 +36,6 @@ export function RecentTransactions() {
   if (data.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Transaksi Terbaru</h3>
         <p className="text-sm text-gray-400 text-center py-4">Belum ada transaksi</p>
       </div>
     );
@@ -44,14 +43,18 @@ export function RecentTransactions() {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Transaksi Terbaru</h3>
-      <div className="space-y-2">
+      <div className="space-y-1">
         {data.map((tx) => (
-          <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
-            <div>
-              <div className="text-sm font-medium text-gray-900 dark:text-white">{tx.invoiceNumber}</div>
-              <div className="text-xs text-gray-400">
-                {tx.cashier.name} • {new Date(tx.createdAt).toLocaleTimeString("id", { hour: "2-digit", minute: "2-digit" })}
+          <div key={tx.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
+                {tx.invoiceNumber.slice(-3)}
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{tx.invoiceNumber}</div>
+                <div className="text-xs text-gray-400">
+                  {tx.cashier.name} &middot; {new Date(tx.createdAt).toLocaleTimeString("id", { hour: "2-digit", minute: "2-digit" })}
+                </div>
               </div>
             </div>
             <div className="text-sm font-semibold text-gray-900 dark:text-white">

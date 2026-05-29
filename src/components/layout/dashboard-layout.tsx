@@ -30,7 +30,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     }
   }, [darkMode]);
 
-  const marginLeft = isDesktop ? (sidebarCollapsed ? 80 : 240) : 0;
+  const marginLeft = isDesktop ? (sidebarCollapsed ? 64 : 256) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-200">

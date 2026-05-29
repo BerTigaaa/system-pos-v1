@@ -127,6 +127,7 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
         open={openModal}
         onCancel={() => setOpenModal(false)}
         footer={null}
+        width={500}
         destroyOnHidden
       >
         <Form form={openForm} layout="vertical" onFinish={handleOpen}>
@@ -136,7 +137,7 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
             rules={[{ required: true, message: "Masukkan saldo awal" }]}
           >
             <InputNumber
-              className="w-full"
+              className="!w-full"
               min={0}
               prefix="Rp"
               placeholder="0"
@@ -159,6 +160,7 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
         open={closeModal}
         onCancel={() => setCloseModal(false)}
         footer={null}
+        width={500}
         destroyOnHidden
       >
         <Form form={closeForm} layout="vertical" onFinish={handleClose}>
@@ -168,7 +170,7 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
             rules={[{ required: true, message: "Masukkan saldo akhir" }]}
           >
             <InputNumber
-              className="w-full"
+              className="!w-full"
               min={0}
               prefix="Rp"
               placeholder="0"

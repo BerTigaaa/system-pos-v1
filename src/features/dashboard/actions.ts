@@ -2,10 +2,13 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export async function getDashboardStats() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: null };
+  if (!hasPermission(session.user.role, "dashboard", "view"))
+    return { success: false, error: { message: "Forbidden" }, data: null };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -31,12 +34,14 @@ export async function getDashboardStats() {
     ]);
 
   const totalSales = Number(todaySalesAgg._sum.total ?? 0);
+  const avgTransaction = todayTransactions > 0 ? Math.round(totalSales / todayTransactions) : 0;
 
   return {
     success: true,
     data: {
       todayTransactions,
       totalSales,
+      avgTransaction,
       totalProducts,
       lowStockList: lowStockProducts,
     },
@@ -44,26 +49,36 @@ export async function getDashboardStats() {
 }
 
 export async function getSalesChart(days = 7) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [] };
+
+  const startDate = new Date();
+  startDate.setHours(0, 0, 0, 0);
+  startDate.setDate(startDate.getDate() - days + 1);
+
+  const transactions = await prisma.transaction.findMany({
+    where: { createdAt: { gte: startDate }, status: "COMPLETED" },
+    select: { createdAt: true, total: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const dailyMap = new Map<string, { total: number; count: number }>();
+  for (const t of transactions) {
+    const key = t.createdAt.toISOString().split("T")[0];
+    const existing = dailyMap.get(key) ?? { total: 0, count: 0 };
+    existing.total += Number(t.total);
+    existing.count++;
+    dailyMap.set(key, existing);
+  }
+
+  const fmt = new Intl.DateTimeFormat("id", { weekday: "short", day: "numeric" });
   const data: { date: string; total: number; count: number }[] = [];
-
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - i);
-    const next = new Date(d);
-    next.setDate(next.getDate() + 1);
-
-    const agg = await prisma.transaction.aggregate({
-      where: { createdAt: { gte: d, lt: next }, status: "COMPLETED" },
-      _sum: { total: true },
-      _count: true,
-    });
-
-    data.push({
-      date: d.toLocaleDateString("id", { weekday: "short", day: "numeric" }),
-      total: Number(agg._sum.total ?? 0),
-      count: agg._count,
-    });
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const key = d.toISOString().split("T")[0];
+    const val = dailyMap.get(key) ?? { total: 0, count: 0 };
+    data.push({ date: fmt.format(d), total: val.total, count: val.count });
   }
 
   return { success: true, data };

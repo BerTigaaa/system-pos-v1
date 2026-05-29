@@ -1,6 +1,6 @@
 import { UserRole } from "@prisma/client";
 
-export type ModuleAction = "view" | "create" | "edit" | "delete" | "close";
+export type ModuleAction = "view" | "create" | "edit" | "delete" | "close" | "export";
 
 type PermissionMap = Record<string, UserRole[]>;
 
@@ -11,6 +11,7 @@ const modulePermissions: Record<string, PermissionMap> = {
   pos: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
     create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    edit: ["SUPER_ADMIN", "OWNER", "CASHIER"],
   },
   products: {
     view: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
@@ -57,8 +58,14 @@ const modulePermissions: Record<string, PermissionMap> = {
   },
   shifts: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER"],
-    close: ["SUPER_ADMIN", "OWNER"],
+    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    close: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+  },
+  suppliers: {
+    view: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
+    create: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
+    edit: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
+    delete: ["SUPER_ADMIN", "OWNER"],
   },
   orders: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
@@ -70,8 +77,11 @@ const modulePermissions: Record<string, PermissionMap> = {
     manage: ["SUPER_ADMIN"],
   },
   admin: {
-    view: ["SUPER_ADMIN"],
-    manage: ["SUPER_ADMIN"],
+    view: ["SUPER_ADMIN", "OWNER"],
+    edit: ["SUPER_ADMIN", "OWNER"],
+  },
+  notifications: {
+    view: ["SUPER_ADMIN", "OWNER", "FINANCE", "CASHIER", "WAREHOUSE"],
   },
 };
 

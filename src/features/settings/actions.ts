@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { notifyRole } from "@/lib/notifications";
 
 export async function getBusinessInfo() {
   const session = await auth();
@@ -20,6 +22,8 @@ export async function updateBusinessInfo(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "settings", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const existing = await prisma.businessInfo.findFirst();
   if (!existing) return { success: false, error: { message: "Data bisnis tidak ditemukan" } };
@@ -35,6 +39,13 @@ export async function updateBusinessInfo(data: {
     },
   });
 
+  await notifyRole(["OWNER"], {
+    type: "SETTINGS_CHANGED",
+    title: "Profil Bisnis Diubah",
+    message: "Profil bisnis telah diperbarui.",
+    data: { section: "business_info" },
+  });
+
   revalidatePath("/settings");
   return { success: true };
 }
@@ -44,6 +55,8 @@ export async function saveSelfOrderSettings(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "settings", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const existing = await prisma.businessInfo.findFirst();
   if (!existing) return { success: false, error: { message: "Data bisnis tidak ditemukan" } };
@@ -53,6 +66,13 @@ export async function saveSelfOrderSettings(data: {
     data: { selfOrderEnabled: data.selfOrderEnabled },
   });
 
+  await notifyRole(["OWNER"], {
+    type: "SETTINGS_CHANGED",
+    title: "Pengaturan Pesanan Diubah",
+    message: `Pesanan mandiri ${data.selfOrderEnabled ? "diaktifkan" : "dinonaktifkan"}.`,
+    data: { section: "self_order", selfOrderEnabled: data.selfOrderEnabled },
+  });
+
   revalidatePath("/settings");
   return { success: true };
 }
@@ -60,6 +80,8 @@ export async function saveSelfOrderSettings(data: {
 export async function saveTableSettings(data: { totalTables: number }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "settings", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const existing = await prisma.businessInfo.findFirst();
   if (!existing) return { success: false, error: { message: "Data bisnis tidak ditemukan" } };
@@ -87,11 +109,18 @@ export async function saveTableSettings(data: { totalTables: number }) {
       });
     }
 
-    for (const num of toCreate) {
-      await tx.diningTable.create({
-        data: { businessInfoId: existing.id, tableNumber: num },
+    if (toCreate.length > 0) {
+      await tx.diningTable.createMany({
+        data: toCreate.map((num) => ({ businessInfoId: existing.id, tableNumber: num })),
       });
     }
+  });
+
+  await notifyRole(["OWNER"], {
+    type: "SETTINGS_CHANGED",
+    title: "Jumlah Meja Diubah",
+    message: `Jumlah meja diubah menjadi ${data.totalTables}.`,
+    data: { section: "tables", totalTables: data.totalTables },
   });
 
   revalidatePath("/settings");
@@ -137,4 +166,34 @@ export async function getAvailableTables() {
       isAvailable: !occupiedNumbers.includes(num),
     })),
   };
+}
+
+export async function getSettings() {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: {} };
+  if (!hasPermission(session.user.role, "settings", "view"))
+    return { success: false as const, error: { message: "Forbidden" }, data: {} };
+
+  const settings = await prisma.setting.findMany();
+  const map: Record<string, string> = {};
+  for (const s of settings) {
+    map[s.key] = s.value;
+  }
+  return { success: true as const, data: map };
+}
+
+export async function saveSetting(key: string, value: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "settings", "edit"))
+    return { success: false as const, error: { message: "Forbidden" } };
+
+  await prisma.setting.upsert({
+    where: { key },
+    create: { key, value },
+    update: { value },
+  });
+
+  revalidatePath("/settings");
+  return { success: true as const };
 }

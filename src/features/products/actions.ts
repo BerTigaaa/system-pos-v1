@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { productSchema, categorySchema } from "./types";
 import { hasPermission } from "@/lib/permissions";
 import { auth } from "@/lib/auth";
+import { createAuditLog } from "@/lib/audit-log";
+import { notifyRole } from "@/lib/notifications";
 
 export async function getProducts(params: {
   search?: string;
@@ -13,6 +15,11 @@ export async function getProducts(params: {
   page?: number;
   pageSize?: number;
 }) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
+  if (!hasPermission(session.user.role, "products", "view"))
+    return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
+
   const { search, categoryId, isActive, page = 1, pageSize = 10 } = params;
 
   const where: Record<string, unknown> = { deletedAt: null };
@@ -45,6 +52,11 @@ export async function getProducts(params: {
 }
 
 export async function getProductById(id: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "products", "view"))
+    return { success: false, error: { message: "Forbidden" } };
+
   const p = await prisma.product.findUnique({
     where: { id },
     include: { category: { select: { id: true, name: true } } },
@@ -75,6 +87,21 @@ export async function createProduct(formData: FormData) {
     },
   });
 
+  await createAuditLog({
+    userId: session.user.id,
+    action: "CREATE",
+    module: "products",
+    description: `Membuat produk ${product.name} (${product.sku})`,
+    newData: parsed.data as unknown as Record<string, unknown>,
+  });
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "PRODUCT_ADDED",
+    title: "Produk Baru",
+    message: `${product.name} (${product.sku}) telah ditambahkan.`,
+    data: { productId: product.id },
+  });
+
   revalidatePath("/products");
   return { success: true, data: { id: product.id } };
 }
@@ -93,10 +120,33 @@ export async function updateProduct(id: string, formData: FormData) {
   });
   if (dup) return { success: false, error: { message: "SKU sudah digunakan" } };
 
+  const oldData = await prisma.product.findUnique({
+    where: { id },
+    select: { name: true, sku: true, buyPrice: true, sellPrice: true, stock: true, minStock: true },
+  });
+
   await prisma.product.update({
     where: { id },
     data: { ...parsed.data, categoryId: parsed.data.categoryId || null },
   });
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "UPDATE",
+    module: "products",
+    description: `Mengupdate produk ${parsed.data.name}`,
+    oldData: oldData as unknown as Record<string, unknown>,
+    newData: parsed.data as unknown as Record<string, unknown>,
+  });
+
+  if (parsed.data.stock <= parsed.data.minStock) {
+    await notifyRole(["OWNER", "WAREHOUSE"], {
+      type: "LOW_STOCK",
+      title: "Stok Menipis",
+      message: `${parsed.data.name} (${parsed.data.sku}): stok ${parsed.data.stock}/${parsed.data.minStock}.`,
+      data: { productId: id, stock: parsed.data.stock, minStock: parsed.data.minStock },
+    });
+  }
 
   revalidatePath("/products");
   return { success: true };
@@ -109,11 +159,27 @@ export async function deleteProduct(id: string) {
     return { success: false, error: { message: "Forbidden" } };
 
   const txCount = await prisma.transactionItem.count({ where: { productId: id } });
+  const p = await prisma.product.findUnique({ where: { id }, select: { name: true, sku: true } });
+
   if (txCount > 0) {
     await prisma.product.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
   } else {
     await prisma.product.delete({ where: { id } });
   }
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "DELETE",
+    module: "products",
+    description: `Menghapus produk ${p?.name ?? id}`,
+  });
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "PRODUCT_DELETED",
+    title: "Produk Dihapus",
+    message: `${p?.name} (${p?.sku}) telah dihapus.`,
+    data: { productId: id },
+  });
 
   revalidatePath("/products");
   return { success: true };
@@ -122,8 +188,26 @@ export async function deleteProduct(id: string) {
 export async function toggleProductActive(id: string, isActive: boolean) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "products", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
+  const p = await prisma.product.findUnique({ where: { id }, select: { name: true } });
   await prisma.product.update({ where: { id }, data: { isActive } });
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: isActive ? "ACTIVATE" : "DEACTIVATE",
+    module: "products",
+    description: `${isActive ? "Mengaktifkan" : "Menonaktifkan"} produk ${p?.name ?? id}`,
+  });
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "PRODUCT_STATUS_CHANGED",
+    title: isActive ? "Produk Diaktifkan" : "Produk Dinonaktifkan",
+    message: `${p?.name} telah ${isActive ? "diaktifkan" : "dinonaktifkan"}.`,
+    data: { productId: id, isActive },
+  });
+
   revalidatePath("/products");
   return { success: true };
 }
@@ -131,6 +215,9 @@ export async function toggleProductActive(id: string, isActive: boolean) {
 // ── Categories ──
 
 export async function getCategories() {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [] };
+
   const data = await prisma.category.findMany({
     where: { isActive: true },
     include: { _count: { select: { products: true } } },
@@ -142,11 +229,21 @@ export async function getCategories() {
 export async function createCategory(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "products", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
   await prisma.category.create({ data: parsed.data });
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "CREATE",
+    module: "categories",
+    description: `Membuat kategori ${parsed.data.name}`,
+  });
+
   revalidatePath("/products");
   return { success: true };
 }
@@ -154,11 +251,21 @@ export async function createCategory(formData: FormData) {
 export async function updateCategory(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "products", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
   await prisma.category.update({ where: { id }, data: parsed.data });
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "UPDATE",
+    module: "categories",
+    description: `Mengupdate kategori ${parsed.data.name}`,
+  });
+
   revalidatePath("/products");
   return { success: true };
 }
@@ -166,11 +273,23 @@ export async function updateCategory(id: string, formData: FormData) {
 export async function deleteCategory(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "products", "delete"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const count = await prisma.product.count({ where: { categoryId: id, deletedAt: null } });
   if (count > 0) return { success: false, error: { message: `Kategori digunakan ${count} produk` } };
 
+  const c = await prisma.category.findUnique({ where: { id }, select: { name: true } });
+
   await prisma.category.delete({ where: { id } });
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "DELETE",
+    module: "categories",
+    description: `Menghapus kategori ${c?.name ?? id}`,
+  });
+
   revalidatePath("/products");
   return { success: true };
 }

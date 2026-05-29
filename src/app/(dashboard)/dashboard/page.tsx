@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DollarOutlined, ShoppingCartOutlined, RiseOutlined } from "@ant-design/icons";
+import { DollarOutlined, ShoppingCartOutlined, RiseOutlined, TeamOutlined } from "@ant-design/icons";
 import { useSession } from "next-auth/react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
@@ -10,12 +10,14 @@ import { SalesChart } from "@/features/dashboard/components/sales-chart";
 import { LowStockList } from "@/features/dashboard/components/low-stock-list";
 import { RecentTransactions } from "@/features/dashboard/components/recent-transactions";
 import { getDashboardStats } from "@/features/dashboard/actions";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const [stats, setStats] = useState<{
     todayTransactions: number;
     totalSales: number;
+    avgTransaction: number;
     totalProducts: number;
     lowStockList: { id: string; name: string; sku: string; stock: number; min_stock: number }[];
   } | null>(null);
@@ -58,6 +60,13 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
+          title="Rata-rata Transaksi"
+          value={`Rp ${(stats?.avgTransaction ?? 0).toLocaleString("id")}`}
+          icon={<TeamOutlined />}
+          color="linear-gradient(135deg, #8B5CF6, #7C3AED)"
+          loading={loading}
+        />
+        <StatCard
           title="Total Produk"
           value={stats?.totalProducts ?? 0}
           icon={<RiseOutlined />}
@@ -79,6 +88,17 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+            Transaksi Terbaru
+          </h3>
+          <Link
+            href="/transactions"
+            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Lihat Semua &rarr;
+          </Link>
+        </div>
         <RecentTransactions />
       </div>
     </div>

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { openShiftSchema, closeShiftSchema } from "./types";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { notifyRole } from "@/lib/notifications";
 
 export async function getActiveShift() {
   const session = await auth();
@@ -39,6 +41,8 @@ export async function getShiftList(params: {
   const session = await auth();
   if (!session?.user?.id)
     return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
+  if (!hasPermission(session.user.role, "shifts", "view"))
+    return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
 
   const { search, page = 1, pageSize = 10 } = params;
 
@@ -89,6 +93,8 @@ export async function getShiftList(params: {
 export async function openShift(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "shifts", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const active = await prisma.shift.findFirst({
     where: { userId: session.user.id, status: "OPEN" },
@@ -98,12 +104,21 @@ export async function openShift(formData: FormData) {
   const parsed = openShiftSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+
   await prisma.shift.create({
     data: {
       userId: session.user.id,
       openingBalance: parsed.data.openingBalance,
       notes: parsed.data.notes,
     },
+  });
+
+  await notifyRole(["OWNER", "FINANCE"], {
+    type: "SETTINGS_CHANGED",
+    title: "Shift Dibuka",
+    message: `${user?.name ?? session.user.id} membuka shift dengan saldo Rp ${Number(parsed.data.openingBalance).toLocaleString("id")}.`,
+    data: { userId: session.user.id, openingBalance: Number(parsed.data.openingBalance) },
   });
 
   revalidatePath("/shifts");
@@ -113,12 +128,14 @@ export async function openShift(formData: FormData) {
 export async function closeShift(shiftId: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "shifts", "close"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const parsed = closeShiftSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
   const shift = await prisma.shift.findUnique({
-    where: { id: shiftId },
+    where: { id: shiftId, ...(session.user.role === "CASHIER" ? { userId: session.user.id } : {}) },
     include: {
       transactions: {
         where: { status: "COMPLETED" },
@@ -149,6 +166,8 @@ export async function closeShift(shiftId: string, formData: FormData) {
     }
   }
 
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+
   await prisma.shift.update({
     where: { id: shiftId },
     data: {
@@ -163,6 +182,13 @@ export async function closeShift(shiftId: string, formData: FormData) {
       closedAt: new Date(),
       notes: parsed.data.notes || shift.notes,
     },
+  });
+
+  await notifyRole(["OWNER", "FINANCE"], {
+    type: "SETTINGS_CHANGED",
+    title: "Shift Ditutup",
+    message: `${user?.name ?? session.user.id} menutup shift. Penjualan: Rp ${totalSales.toLocaleString("id")}, ${shift.transactions.length} transaksi.`,
+    data: { shiftId, totalSales, totalTransactions: shift.transactions.length },
   });
 
   revalidatePath("/shifts");

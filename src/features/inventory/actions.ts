@@ -3,6 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { createAuditLog } from "@/lib/audit-log";
+import { hasPermission } from "@/lib/permissions";
+import { notifyRole } from "@/lib/notifications";
 
 export async function getMovements(params: {
   search?: string;
@@ -12,6 +15,8 @@ export async function getMovements(params: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
+  if (!hasPermission(session.user.role, "inventory", "view"))
+    return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
 
   const { search, type, page = 1, pageSize = 10 } = params;
 
@@ -65,6 +70,8 @@ export async function getMovements(params: {
 export async function adjustStock(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "inventory", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const productId = formData.get("productId") as string;
   const type = formData.get("type") as string;
@@ -104,11 +111,40 @@ export async function adjustStock(formData: FormData) {
     }),
   ]);
 
+  await createAuditLog({
+    userId: session.user.id,
+    action: "ADJUST_STOCK",
+    module: "inventory",
+    description: `Adjust stok ${product.name}: ${product.stock} → ${newStock} (${type})`,
+    newData: { type, quantity, reason, notes} as unknown as Record<string, unknown>,
+  });
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "STOCK_ADJUSTED",
+    title: "Stok Disesuaikan",
+    message: `${product.name}: ${product.stock} → ${newStock} (${type}${reason ? ` - ${reason}` : ""})`,
+    data: { productId, type, quantity, newStock },
+  });
+
+  if (newStock <= product.minStock) {
+    await notifyRole(["OWNER", "WAREHOUSE"], {
+      type: "LOW_STOCK",
+      title: "Stok Menipis",
+      message: `${product.name} (${product.sku}): stok ${newStock}/${product.minStock}.`,
+      data: { productId, stock: newStock, minStock: product.minStock },
+    });
+  }
+
   revalidatePath("/inventory");
   return { success: true };
 }
 
 export async function getStockOpnameList(params: { page?: number; pageSize?: number }) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
+  if (!hasPermission(session.user.role, "inventory", "view"))
+    return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
+
   const { page = 1, pageSize = 10 } = params;
 
   const [data, total] = await Promise.all([
@@ -130,6 +166,8 @@ export async function getStockOpnameList(params: { page?: number; pageSize?: num
 export async function createStockOpname(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "inventory", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const rawItems = formData.getAll("items") as string[];
   const notes = (formData.get("notes") as string) || null;
@@ -137,26 +175,43 @@ export async function createStockOpname(formData: FormData) {
   if (!rawItems.length) return { success: false, error: { message: "Minimal 1 item" } };
 
   const items = rawItems.map((i) => JSON.parse(i));
-  const opnameItems = [];
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, stock: true },
+  });
+  const productMap = new Map(products.map((p) => [p.id, p.stock]));
 
+  const opnameItems = [];
   for (const item of items) {
-    const product = await prisma.product.findUnique({ where: { id: item.productId } });
-    if (!product) continue;
-    const diff = item.physicalStock - product.stock;
+    const currentStock = productMap.get(item.productId);
+    if (currentStock === undefined) continue;
+    const diff = item.physicalStock - currentStock;
     opnameItems.push({
-      productId: product.id,
-      systemStock: product.stock,
+      productId: item.productId,
+      systemStock: currentStock,
       physicalStock: item.physicalStock,
       difference: diff,
     });
   }
 
-  await prisma.stockOpname.create({
+  const opname = await prisma.stockOpname.create({
     data: {
       userId: session.user.id,
       notes,
       items: { create: opnameItems },
     },
+  });
+
+  const totalItems = opnameItems.length;
+  const totalDiff = opnameItems.reduce((sum, i) => sum + Math.abs(i.difference), 0);
+  const ref = opname.id.slice(0, 8).toUpperCase();
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "STOCK_OPNAME_CREATED",
+    title: "Opname Stok Dibuat",
+    message: `Opname #${ref}: ${totalItems} produk, total selisih ${totalDiff}.`,
+    data: { opnameId: opname.id, totalItems, totalDiff },
   });
 
   revalidatePath("/inventory");
@@ -166,6 +221,8 @@ export async function createStockOpname(formData: FormData) {
 export async function applyStockOpname(opnameId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "inventory", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const opname = await prisma.stockOpname.findUnique({
     where: { id: opnameId },
@@ -176,17 +233,28 @@ export async function applyStockOpname(opnameId: string) {
   if (opname.isAdjusted) return { success: false, error: { message: "Sudah diaplikasikan" } };
 
   await prisma.$transaction(async (tx) => {
-    for (const item of opname.items) {
-      const product = await tx.product.findUnique({ where: { id: item.productId } });
-      if (!product) continue;
+    const productIds = opname.items.map((i) => i.productId);
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true },
+    });
+    const existingIds = new Set(products.map((p) => p.id));
 
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: item.physicalStock },
-      });
+    await Promise.all(
+      opname.items
+        .filter((item) => existingIds.has(item.productId))
+        .map((item) =>
+          tx.product.update({
+            where: { id: item.productId },
+            data: { stock: item.physicalStock },
+          })
+        )
+    );
 
-      await tx.inventoryMovement.create({
-        data: {
+    await tx.inventoryMovement.createMany({
+      data: opname.items
+        .filter((item) => existingIds.has(item.productId))
+        .map((item) => ({
           productId: item.productId,
           userId: session.user.id,
           type: "OPNAME",
@@ -196,14 +264,21 @@ export async function applyStockOpname(opnameId: string) {
           referenceId: opnameId,
           referenceType: "STOCK_OPNAME",
           reason: item.difference > 0 ? "Kelebihan stok" : "Kekurangan stok",
-        },
-      });
-    }
+        })),
+    });
 
     await tx.stockOpname.update({
       where: { id: opnameId },
       data: { isAdjusted: true, adjustedAt: new Date() },
     });
+  });
+
+  const diffCount = opname.items.filter((i) => i.difference !== 0).length;
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "STOCK_ADJUSTED",
+    title: "Opname Stok Diterapkan",
+    message: `Opname ${opnameId.slice(0, 8)}: ${diffCount} item berbeda dari ${opname.items.length} total.`,
+    data: { opnameId, totalItems: opname.items.length, diffCount },
   });
 
   revalidatePath("/inventory");

@@ -4,8 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { supplierSchema } from "./types";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { notifyRole } from "@/lib/notifications";
 
 export async function getSuppliers(params: { search?: string; page?: number; pageSize?: number }) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
+
   const { search, page = 1, pageSize = 10 } = params;
 
   const where: Record<string, unknown> = { isActive: true };
@@ -32,11 +37,24 @@ export async function getSuppliers(params: { search?: string; page?: number; pag
 export async function createSupplier(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "suppliers", "create"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const parsed = supplierSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
-  await prisma.supplier.create({ data: parsed.data });
+  const supplier = await prisma.supplier.create({
+    data: parsed.data,
+    select: { id: true, name: true },
+  });
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "SUPPLIER_CREATED",
+    title: "Supplier Baru",
+    message: `Supplier baru: ${supplier.name}.`,
+    data: { supplierId: supplier.id, name: supplier.name },
+  });
+
   revalidatePath("/inventory");
   return { success: true };
 }
@@ -44,11 +62,23 @@ export async function createSupplier(formData: FormData) {
 export async function updateSupplier(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "suppliers", "edit"))
+    return { success: false, error: { message: "Forbidden" } };
 
   const parsed = supplierSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
+  const old = await prisma.supplier.findUnique({ where: { id }, select: { name: true } });
+
   await prisma.supplier.update({ where: { id }, data: parsed.data });
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "SUPPLIER_UPDATED",
+    title: "Supplier Diubah",
+    message: `Data supplier ${old?.name} telah diperbarui.`,
+    data: { supplierId: id, name: parsed.data.name },
+  });
+
   revalidatePath("/inventory");
   return { success: true };
 }
@@ -56,6 +86,11 @@ export async function updateSupplier(id: string, formData: FormData) {
 export async function deleteSupplier(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!hasPermission(session.user.role, "suppliers", "delete"))
+    return { success: false, error: { message: "Forbidden" } };
+
+  const supplier = await prisma.supplier.findUnique({ where: { id }, select: { name: true } });
+  if (!supplier) return { success: false, error: { message: "Supplier tidak ditemukan" } };
 
   const count = await prisma.inventoryMovement.count({ where: { supplierId: id } });
   if (count > 0) {
@@ -63,6 +98,13 @@ export async function deleteSupplier(id: string) {
   } else {
     await prisma.supplier.delete({ where: { id } });
   }
+
+  await notifyRole(["OWNER", "WAREHOUSE"], {
+    type: "SUPPLIER_DELETED",
+    title: "Supplier Dihapus",
+    message: `Supplier ${supplier.name} telah dihapus.`,
+    data: { supplierId: id, name: supplier.name },
+  });
 
   revalidatePath("/inventory");
   return { success: true };

@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Card, Switch, Button, Form, Input, Spin, QRCode } from "antd";
-import { SettingOutlined, QrcodeOutlined, TableOutlined, PlusOutlined, MinusOutlined, PrinterOutlined } from "@ant-design/icons";
+import { Card, Switch, Button, Form, Input, Spin, QRCode, Tabs } from "antd";
+import { SettingOutlined, TableOutlined, PlusOutlined, MinusOutlined, PrinterOutlined, DollarOutlined, FileTextOutlined, UserOutlined } from "@ant-design/icons";
 import { getBusinessInfo, updateBusinessInfo, saveSelfOrderSettings, saveTableSettings } from "@/features/settings/actions";
+import { TaxSettings } from "@/features/settings/components/tax-settings";
+import { ReceiptSettings } from "@/features/settings/components/receipt-settings";
 import { useToast } from "@/components/ui/toast";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type DiningTable = { id: string; tableNumber: number; isActive: boolean };
 type BusinessData = {
@@ -104,56 +107,100 @@ export default function SettingsPage() {
   const tables = (savedData?.diningTables ?? []).filter((t) => t.tableNumber <= totalTables);
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pengaturan</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">Kelola informasi bisnis dan fitur</p>
       </div>
 
-      {/* BUSINESS INFO FORM */}
-      <Card title={<span><SettingOutlined /> Informasi Bisnis</span>} className="mb-6">
-        <Form layout="vertical" initialValues={bizInit ?? undefined} onFinish={handleSaveBiz}>
-          <Form.Item label="Nama Bisnis" name="name" rules={[{ required: true, message: "Wajib diisi" }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="Nama Pemilik" name="ownerName" rules={[{ required: true, message: "Wajib diisi" }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="Alamat" name="address">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item label="Telepon" name="phone">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Email" name="email">
-            <Input type="email" />
-          </Form.Item>
-          <div className="flex justify-end">
-            <Button type="primary" htmlType="submit" loading={savingBiz}>
-              Simpan Informasi Bisnis
-            </Button>
-          </div>
-        </Form>
-      </Card>
-
-      {/* TABLES FORM */}
-      <Card title={<span><TableOutlined /> Meja</span>} className="mb-6">
-        <TableForm totalTables={totalTables} onSave={handleSaveTable} saving={savingTable} />
-      </Card>
-
-      {/* SELF-ORDER FORM */}
-      <Card title={<span><QrcodeOutlined /> Pemesanan Mandiri (Self-Order)</span>} className="mb-6">
-        {soInit && (
-          <SelfOrderForm
-            key={JSON.stringify(soInit)}
-            initialValues={soInit as { selfOrderEnabled: boolean; totalTables: number }}
-            baseUrl={baseUrl}
-            savedData={savedData}
-            onSave={handleSaveSO}
-            saving={savingSO}
-          />
-        )}
-      </Card>
+      <Tabs
+        defaultActiveKey="business"
+        items={[
+          {
+            key: "business",
+            label: <span><SettingOutlined /> Bisnis</span>,
+            children: (
+              <Card>
+                <Form layout="vertical" initialValues={bizInit ?? undefined} onFinish={handleSaveBiz}>
+                  <Form.Item label="Nama Bisnis" name="name" rules={[{ required: true, message: "Wajib diisi" }]}>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item label="Nama Pemilik" name="ownerName" rules={[{ required: true, message: "Wajib diisi" }]}>
+                    <Input />
+                  </Form.Item>
+                  <Form.Item label="Alamat" name="address">
+                    <Input.TextArea rows={2} />
+                  </Form.Item>
+                  <Form.Item label="Telepon" name="phone">
+                    <Input />
+                  </Form.Item>
+                  <Form.Item label="Email" name="email">
+                    <Input type="email" />
+                  </Form.Item>
+                  <div className="flex justify-end">
+                    <Button type="primary" htmlType="submit" loading={savingBiz}>
+                      Simpan Informasi Bisnis
+                    </Button>
+                  </div>
+                </Form>
+              </Card>
+            ),
+          },
+          {
+            key: "pos",
+            label: <span><DollarOutlined /> POS</span>,
+            children: (
+              <Card title="Konfigurasi POS">
+                <TaxSettings />
+              </Card>
+            ),
+          },
+          {
+            key: "receipt",
+            label: <span><FileTextOutlined /> Struk</span>,
+            children: (
+              <Card title="Konfigurasi Struk">
+                <ReceiptSettings />
+              </Card>
+            ),
+          },
+          {
+            key: "tables",
+            label: <span><TableOutlined /> Meja</span>,
+            children: (
+              <>
+                <Card title="Self-Order" className="mb-6">
+                  {soInit && (
+                    <SelfOrderForm
+                      key={JSON.stringify(soInit)}
+                      initialValues={soInit as { selfOrderEnabled: boolean; totalTables: number }}
+                      baseUrl={baseUrl}
+                      savedData={savedData}
+                      onSave={handleSaveSO}
+                      saving={savingSO}
+                    />
+                  )}
+                </Card>
+                <Card title="Jumlah Meja">
+                  <TableForm totalTables={totalTables} onSave={handleSaveTable} saving={savingTable} />
+                </Card>
+              </>
+            ),
+          },
+          {
+            key: "employees",
+            label: <span><UserOutlined /> Karyawan</span>,
+            children: (
+              <Card title="Manajemen Karyawan">
+                <p className="text-gray-400 text-sm">Manajemen karyawan tersedia di halaman terpisah.</p>
+                <Button type="link" onClick={() => window.location.href = "/employees"}>
+                  Buka Manajemen Karyawan →
+                </Button>
+              </Card>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -243,7 +290,7 @@ function SelfOrderForm({
         <div class="grid">
         ${tables.map((t) => `
           <div class="card">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${baseUrl}/order/${t.tableNumber}`)}" alt="Meja ${t.tableNumber}" width="120" height="120" />
+            <img src="${process.env.NEXT_PUBLIC_QR_API_URL}?size=150x150&data=${encodeURIComponent(`${baseUrl}/order/${t.tableNumber}`)}" alt="Meja ${t.tableNumber}" width="120" height="120" />
             <div class="label">Meja ${t.tableNumber}</div>
           </div>`).join("")}
         </div>

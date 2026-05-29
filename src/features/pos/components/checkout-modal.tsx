@@ -163,12 +163,12 @@ export function CheckoutModal({
               ]}
             >
               <InputNumber
-                className="w-full"
+                className="!w-full"
                 min={total}
                 prefix="Rp"
                 placeholder="0"
                 size="large"
-                style={{ borderRadius: 10 }}
+                style={{ borderRadius: 10, width: "100%" }}
                 formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
               />
             </Form.Item>

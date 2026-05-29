@@ -12,7 +12,7 @@ export function LowStockList({ items }: Props) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
       {items.map((p) => {
         const isOut = p.stock === 0;
         return (
