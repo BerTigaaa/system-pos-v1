@@ -1,0 +1,48 @@
+name: Deploy POS V1
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            echo "Go to project directory..."
+            cd /var/www/posv1
+
+            echo "Pull latest code..."
+            git pull origin main
+
+            echo "Install dependencies..."
+            npm install
+
+            echo "Generate Prisma client..."
+            npx prisma generate
+
+            echo "Run Prisma migrations..."
+            npx prisma migrate deploy
+
+            echo "Build Next.js..."
+            npm run build
+
+            echo "Restart PM2..."
+            pm2 restart posv1 --update-env
+
+            echo "Save PM2..."
+            pm2 save
+
+            echo "Deployment finished."
