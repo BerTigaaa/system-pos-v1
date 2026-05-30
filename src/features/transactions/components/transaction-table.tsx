@@ -48,22 +48,28 @@ export function TransactionTable() {
 
   const load = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true);
-    const params: TransactionFilter = { page: p, pageSize: ps };
-    if (search) params.search = search;
-    if (statusFilter) params.status = statusFilter as TransactionFilter["status"];
-    if (paymentFilter) params.paymentMethod = paymentFilter as TransactionFilter["paymentMethod"];
-    if (dateRange) {
-      params.dateFrom = dateRange[0];
-      params.dateTo = dateRange[1];
+    try {
+      const params: TransactionFilter = { page: p, pageSize: ps };
+      if (search) params.search = search;
+      if (statusFilter) params.status = statusFilter as TransactionFilter["status"];
+      if (paymentFilter) params.paymentMethod = paymentFilter as TransactionFilter["paymentMethod"];
+      if (dateRange) {
+        params.dateFrom = dateRange[0];
+        params.dateTo = dateRange[1];
+      }
+      const res = await getTransactions(params);
+      if (res.success) {
+        setData(res.data as TransactionRow[]);
+        setTotal(res.total);
+      } else {
+        toast.error(res.error?.message ?? "Gagal memuat data");
+      }
+    } catch (err) {
+      console.error("Gagal memuat transaksi:", err);
+      toast.error("Terjadi kesalahan saat memuat data");
+    } finally {
+      setLoading(false);
     }
-    const res = await getTransactions(params);
-    if (res.success) {
-      setData(res.data as TransactionRow[]);
-      setTotal(res.total);
-    } else {
-      toast.error(res.error?.message ?? "Gagal memuat data");
-    }
-    setLoading(false);
   }, [page, pageSize, search, statusFilter, paymentFilter, dateRange]);
 
   useEffect(() => { load(); }, [load]);

@@ -12,9 +12,14 @@ export function YearlySalesReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await getYearlySales(year);
-    if (res.success) setData(res.data as YearlySalesRow[]);
-    setLoading(false);
+    try {
+      const res = await getYearlySales(year);
+      if (res.success) setData(res.data as YearlySalesRow[]);
+    } catch (err) {
+      console.error("Gagal memuat laporan tahunan:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [year]);
 
   useEffect(() => { load(); }, [load]);

@@ -21,9 +21,14 @@ export function StockReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await getStockReport(categoryId);
-    if (res.success) setData(res.data as StockReportRow[]);
-    setLoading(false);
+    try {
+      const res = await getStockReport(categoryId);
+      if (res.success) setData(res.data as StockReportRow[]);
+    } catch (err) {
+      console.error("Gagal memuat laporan stok:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [categoryId]);
 
   useEffect(() => { load(); }, [load]);

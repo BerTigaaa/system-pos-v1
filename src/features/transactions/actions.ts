@@ -24,70 +24,75 @@ export async function getTransactions(params: {
   page?: number;
   pageSize?: number;
 }) {
-  const session = await auth();
-  if (!session?.user?.id)
-    return { success: false as const, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 20 };
+  try {
+    const session = await auth();
+    if (!session?.user?.id)
+      return { success: false as const, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 20 };
 
-  if (!hasPermission(session.user.role, "transactions", "view"))
-    return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 20 };
+    if (!hasPermission(session.user.role, "transactions", "view"))
+      return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 20 };
 
-  const parsed = transactionFilterSchema.safeParse(params);
-  if (!parsed.success)
-    return { success: false as const, error: { message: parsed.error.issues[0].message }, data: [], total: 0, page: 1, pageSize: 20 };
+    const parsed = transactionFilterSchema.safeParse(params);
+    if (!parsed.success)
+      return { success: false as const, error: { message: parsed.error.issues[0].message }, data: [], total: 0, page: 1, pageSize: 20 };
 
-  const { search, cashierId, status, paymentMethod, dateFrom, dateTo, page, pageSize } = parsed.data;
+    const { search, cashierId, status, paymentMethod, dateFrom, dateTo, page, pageSize } = parsed.data;
 
-  const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {};
 
-  if (search) {
-    where.OR = [
-      { invoiceNumber: { contains: search, mode: "insensitive" } },
-      { customerName: { contains: search, mode: "insensitive" } },
-    ];
+    if (search) {
+      where.OR = [
+        { invoiceNumber: { contains: search, mode: "insensitive" } },
+        { customerName: { contains: search, mode: "insensitive" } },
+      ];
+    }
+    if (cashierId) where.cashierId = cashierId;
+    if (status) where.status = status;
+    if (dateFrom || dateTo) {
+      const createdAt: Record<string, Date> = {};
+      if (dateFrom) createdAt.gte = new Date(dateFrom);
+      if (dateTo) createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
+      where.createdAt = createdAt;
+    }
+
+    const paymentWhere = paymentMethod ? { payments: { some: { method: paymentMethod } } } : {};
+
+    const [data, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { ...where, ...paymentWhere } as Prisma.TransactionWhereInput,
+        include: {
+          cashier: { select: { id: true, name: true, email: true } },
+          payments: true,
+          items: { take: 1, orderBy: { createdAt: "desc" } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.transaction.count({ where: { ...where, ...paymentWhere } as Prisma.TransactionWhereInput }),
+    ]);
+
+    return {
+      success: true as const,
+      data: data.map((t) => ({
+        id: t.id,
+        invoiceNumber: t.invoiceNumber,
+        cashierName: t.cashier.name,
+        customerName: t.customerName,
+        status: t.status,
+        total: Number(t.total),
+        paymentMethods: t.payments.map((p) => p.method),
+        createdAt: t.createdAt,
+        itemCount: t.items.length,
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  } catch (err) {
+    console.error("getTransactions error:", err);
+    return { success: false as const, error: { message: "Terjadi kesalahan saat memuat data" }, data: [], total: 0, page: 1, pageSize: 20 };
   }
-  if (cashierId) where.cashierId = cashierId;
-  if (status) where.status = status;
-  if (dateFrom || dateTo) {
-    const createdAt: Record<string, Date> = {};
-    if (dateFrom) createdAt.gte = new Date(dateFrom);
-    if (dateTo) createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
-    where.createdAt = createdAt;
-  }
-
-  const paymentWhere = paymentMethod ? { payments: { some: { method: paymentMethod } } } : {};
-
-  const [data, total] = await Promise.all([
-    prisma.transaction.findMany({
-      where: { ...where, ...paymentWhere } as Prisma.TransactionWhereInput,
-      include: {
-        cashier: { select: { id: true, name: true, email: true } },
-        payments: true,
-        items: { take: 1, orderBy: { createdAt: "desc" } },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    prisma.transaction.count({ where: { ...where, ...paymentWhere } as Prisma.TransactionWhereInput }),
-  ]);
-
-  return {
-    success: true as const,
-    data: data.map((t) => ({
-      id: t.id,
-      invoiceNumber: t.invoiceNumber,
-      cashierName: t.cashier.name,
-      customerName: t.customerName,
-      status: t.status,
-      total: Number(t.total),
-      paymentMethods: t.payments.map((p) => p.method),
-      createdAt: t.createdAt,
-      itemCount: t.items.length,
-    })),
-    total,
-    page,
-    pageSize,
-  };
 }
 
 export async function getTransactionById(id: string) {

@@ -14,9 +14,14 @@ export function MonthlySalesReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await getMonthlySales(month, year);
-    if (res.success) setData(res.data as MonthlySalesRow[]);
-    setLoading(false);
+    try {
+      const res = await getMonthlySales(month, year);
+      if (res.success) setData(res.data as MonthlySalesRow[]);
+    } catch (err) {
+      console.error("Gagal memuat laporan bulanan:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [month, year]);
 
   useEffect(() => { load(); }, [load]);

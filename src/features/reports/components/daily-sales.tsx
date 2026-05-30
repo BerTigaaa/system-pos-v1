@@ -13,9 +13,14 @@ export function DailySalesReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await getDailySales(date);
-    if (res.success) setData(res.data as DailySalesRow[]);
-    setLoading(false);
+    try {
+      const res = await getDailySales(date);
+      if (res.success) setData(res.data as DailySalesRow[]);
+    } catch (err) {
+      console.error("Gagal memuat laporan harian:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [date]);
 
   useEffect(() => { load(); }, [load]);

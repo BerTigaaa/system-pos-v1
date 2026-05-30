@@ -25,9 +25,14 @@ export function TopProductsReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await getTopProducts({ dateFrom, dateTo, categoryId });
-    if (res.success) setData(res.data as TopProductRow[]);
-    setLoading(false);
+    try {
+      const res = await getTopProducts({ dateFrom, dateTo, categoryId });
+      if (res.success) setData(res.data as TopProductRow[]);
+    } catch (err) {
+      console.error("Gagal memuat produk terlaris:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [dateFrom, dateTo, categoryId]);
 
   useEffect(() => { load(); }, [load]);

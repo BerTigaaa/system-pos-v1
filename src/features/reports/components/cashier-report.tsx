@@ -16,9 +16,14 @@ export function CashierReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await getCashierReport({ cashierId, dateFrom, dateTo });
-    if (res.success) setData(res.data as CashierReportRow[]);
-    setLoading(false);
+    try {
+      const res = await getCashierReport({ cashierId, dateFrom, dateTo });
+      if (res.success) setData(res.data as CashierReportRow[]);
+    } catch (err) {
+      console.error("Gagal memuat laporan kasir:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [cashierId, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
