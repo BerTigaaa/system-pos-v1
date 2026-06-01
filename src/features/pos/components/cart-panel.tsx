@@ -49,12 +49,12 @@ export function CartPanel() {
   const [mode, setMode] = useState<Mode>("order");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<{ id: string; invoiceNumber: string } | null>(null);
-  const [tables, setTables] = useState<{ tableNumber: number; isAvailable: boolean }[]>([]);
+  const [tables, setTables] = useState<{ tableNumber: number; label: string; isAvailable: boolean }[]>([]);
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   // Payment tab state
-  const [payTables, setPayTables] = useState<number[]>([]);
+  const [payTables, setPayTables] = useState<{ tableNumber: number; label: string }[]>([]);
   const [selectedPayTable, setSelectedPayTable] = useState<number | null>(null);
   const [completedOrders, setCompletedOrders] = useState<OrderData[]>([]);
   const [loadingCompleted, setLoadingCompleted] = useState(false);
@@ -184,7 +184,7 @@ export function CartPanel() {
 
       {/* ===== MODE: PESAN ===== */}
       {mode === "order" && (
-        <>
+        <div className="flex flex-col min-h-0 flex-1">
           <div className="px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800 space-y-2.5">
             <Input
               placeholder="Nama pemesan"
@@ -215,7 +215,7 @@ export function CartPanel() {
                         label: (
                           <span className="flex items-center gap-2">
                             <TableOutlined />
-                            <span>Meja {t.tableNumber}</span>
+                            <span>{t.label || `Meja ${t.tableNumber}`}</span>
                             {!t.isAvailable && <Tag color="red" className="!text-[10px] !px-1 !py-0 !leading-none !m-0">Terisi</Tag>}
                           </span>
                         ),
@@ -306,12 +306,12 @@ export function CartPanel() {
               Pesan
             </Button>
           </div>
-        </>
+        </div>
       )}
 
       {/* ===== MODE: BAYAR ===== */}
       {mode === "pay" && (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
             <Select
               placeholder="Pilih meja dengan pesanan selesai"
@@ -320,7 +320,7 @@ export function CartPanel() {
               value={selectedPayTable}
               onChange={(v) => setSelectedPayTable(v)}
               allowClear
-              options={payTables.map((t) => ({ label: `Meja ${t}`, value: t }))}
+              options={payTables.map((t) => ({ label: t.label || `Meja ${t.tableNumber}`, value: t.tableNumber }))}
               className="table-select"
             />
           </div>
@@ -399,7 +399,7 @@ export function CartPanel() {
 
       {/* ===== MODE: DAFTAR PESANAN ===== */}
       {mode === "list" && (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800">
             <span className="text-xs text-gray-400">{orders.length} pesanan</span>
             <Button size="small" type="text" onClick={loadOrders} icon={<ShoppingCartOutlined />} className="!text-xs">
@@ -422,7 +422,7 @@ export function CartPanel() {
                     <div className="flex items-start justify-between mb-1.5">
                       <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Meja {o.tableNumber} — {o.customerName}
+                          {tables.find((t) => t.tableNumber === o.tableNumber)?.label || `Meja ${o.tableNumber}`} — {o.customerName}
                         </p>
                         <p className="text-[10px] text-gray-400">
                           {new Date(o.createdAt).toLocaleTimeString("id", { hour: "2-digit", minute: "2-digit" })}
@@ -498,7 +498,7 @@ export function CartPanel() {
 
       {/* ===== MODE: SELESAI ===== */}
       {mode === "done" && (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800">
             <span className="text-xs text-gray-400">{doneOrders.length} selesai</span>
             <Button size="small" type="text" onClick={loadDoneOrders} icon={<ShoppingCartOutlined />} className="!text-xs">
@@ -521,7 +521,7 @@ export function CartPanel() {
                     <div className="flex items-start justify-between mb-1.5">
                       <div>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Meja {o.tableNumber} — {o.customerName}
+                          {tables.find((t) => t.tableNumber === o.tableNumber)?.label || `Meja ${o.tableNumber}`} — {o.customerName}
                         </p>
                         <p className="text-[10px] text-gray-400">
                           {new Date(o.createdAt).toLocaleTimeString("id", { hour: "2-digit", minute: "2-digit" })}

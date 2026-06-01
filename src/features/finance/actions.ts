@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 import { getClientIp } from "@/lib/audit-log";
 import { cashFlowFilterSchema, cashFlowFormSchema } from "./types";
@@ -12,7 +12,7 @@ import { Prisma } from "@prisma/client";
 export async function getCashFlowCategories(type?: "IN" | "OUT") {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-  if (!hasPermission(session.user.role, "finance", "view"))
+  if (!await hasPermissionAsync(session.user.role, "finance", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
   const where: Record<string, unknown> = {};
@@ -38,7 +38,7 @@ export async function getCashFlows(params: {
   if (!session?.user?.id)
     return { success: false as const, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 20 };
 
-  if (!hasPermission(session.user.role, "finance", "view"))
+  if (!await hasPermissionAsync(session.user.role, "finance", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 20 };
 
   const parsed = cashFlowFilterSchema.safeParse(params);
@@ -94,7 +94,7 @@ export async function createCashFlow(formData: CashFlowFormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
 
-  if (!hasPermission(session.user.role, "finance", "create"))
+  if (!await hasPermissionAsync(session.user.role, "finance", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const parsed = cashFlowFormSchema.safeParse(formData);
@@ -148,7 +148,7 @@ export async function createCashFlow(formData: CashFlowFormData) {
 export async function updateCashFlow(id: string, formData: CashFlowFormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "finance", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "finance", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const existing = await prisma.cashFlow.findUnique({ where: { id } });
@@ -196,7 +196,7 @@ export async function updateCashFlow(id: string, formData: CashFlowFormData) {
 export async function deleteCashFlow(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "finance", "delete"))
+  if (!await hasPermissionAsync(session.user.role, "finance", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const existing = await prisma.cashFlow.findUnique({ where: { id } });
@@ -236,7 +236,7 @@ export async function deleteCashFlow(id: string) {
 export async function getFinanceSummary(period?: { month?: number; year?: number }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: null };
-  if (!hasPermission(session.user.role, "finance", "view"))
+  if (!await hasPermissionAsync(session.user.role, "finance", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: null };
 
   const now = new Date();
@@ -294,6 +294,106 @@ export async function getFinanceSummary(period?: { month?: number; year?: number
       netProfit,
     },
   };
+}
+
+export async function exportFinance(params: {
+  type: "cash-in" | "cash-out" | "summary";
+  format: "xlsx" | "pdf";
+  categoryId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  month?: number;
+  year?: number;
+}) {
+  const session = await auth();
+  if (!session?.user?.id)
+    return { success: false as const, error: { message: "Unauthorized" } };
+  if (!await hasPermissionAsync(session.user.role, "finance", "view"))
+    return { success: false as const, error: { message: "Forbidden" } };
+
+  let rows: Record<string, unknown>[] = [];
+  let title = "";
+
+  if (params.type === "summary") {
+    const res = await getFinanceSummary({ month: params.month, year: params.year });
+    if (res.success && res.data) {
+      const d = res.data;
+      title = `Rekap Keuangan - ${d.period.month}/${d.period.year}`;
+      rows = [
+        { Metrik: "Penjualan", Nilai: d.sales },
+        { Metrik: "Kas Masuk", Nilai: d.cashIn },
+        { Metrik: "Total Pendapatan", Nilai: d.totalRevenue },
+        { Metrik: "HPP", Nilai: d.hpp },
+        { Metrik: "Gross Profit", Nilai: d.grossProfit },
+        { Metrik: "Kas Keluar", Nilai: d.cashOut },
+        { Metrik: "Net Profit", Nilai: d.netProfit },
+      ];
+    }
+  } else {
+    const flowType = params.type === "cash-in" ? "IN" : "OUT";
+    const res = await getCashFlows({
+      type: flowType,
+      categoryId: params.categoryId,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      page: 1,
+      pageSize: 5000,
+    });
+    if (res.success) {
+      title = flowType === "IN" ? "Kas Masuk" : "Kas Keluar";
+      rows = res.data.map((d) => ({
+        Tanggal: new Date(d.date).toLocaleDateString("id-ID"),
+        Kategori: d.category.name,
+        Deskripsi: d.description,
+        Referensi: d.reference ?? "-",
+        Jumlah: d.amount,
+        User: d.user.name,
+      }));
+    }
+  }
+
+  if (rows.length === 0) {
+    return { success: false as const, error: { message: "Tidak ada data untuk diexport" } };
+  }
+
+  if (params.format === "xlsx") {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 31));
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    return {
+      success: true as const,
+      data: {
+        buffer: Array.from(new Uint8Array(buf)),
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        extension: "xlsx",
+      },
+    };
+  } else {
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF();
+    doc.text(title, 14, 15);
+    if (rows.length > 0) {
+      const headers = Object.keys(rows[0]);
+      const body = rows.map((r) => headers.map((h) => String(r[h] ?? "")));
+      autoTable(doc, {
+        head: [headers],
+        body,
+        startY: 20,
+        styles: { fontSize: 8 },
+      });
+    }
+    return {
+      success: true as const,
+      data: {
+        buffer: Array.from(new Uint8Array(doc.output("arraybuffer"))),
+        contentType: "application/pdf",
+        extension: "pdf",
+      },
+    };
+  }
 }
 
 type CashFlowFormData = {

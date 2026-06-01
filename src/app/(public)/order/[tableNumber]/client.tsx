@@ -21,7 +21,7 @@ type OrderData = {
   items: { id: string; productId: string; productName: string; quantity: number; sellPrice: number; subtotal: number }[];
 };
 
-export function OrderPageClient({ tableNumber, businessName }: { tableNumber: number; businessName: string; logoUrl: string | null }) {
+export function OrderPageClient({ tableNumber, tableLabel, businessName }: { tableNumber: number; tableLabel: string; businessName: string; logoUrl: string | null }) {
   const [products, setProducts] = useState<PosProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -202,7 +202,7 @@ export function OrderPageClient({ tableNumber, businessName }: { tableNumber: nu
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900 truncate">{businessName}</p>
-            <p className="text-xs text-gray-400">Meja {tableNumber} — {customerName || savedName}</p>
+            <p className="text-xs text-gray-400">{tableLabel} — {customerName || savedName}</p>
           </div>
           {orders.length === 0 && (
             <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-500">Ganti Nama</button>
@@ -314,7 +314,7 @@ export function OrderPageClient({ tableNumber, businessName }: { tableNumber: nu
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-gray-900 truncate">{businessName}</p>
-          <p className="text-xs text-gray-400">Meja {tableNumber}</p>
+          <p className="text-xs text-gray-400">{tableLabel}</p>
         </div>
         {savedName && (
           <button onClick={() => setView("orders")} className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1">

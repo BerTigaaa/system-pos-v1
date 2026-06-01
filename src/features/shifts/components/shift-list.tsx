@@ -92,7 +92,7 @@ export function ShiftList({ onClose }: { onClose: (shift: ShiftItem) => void }) 
       key: "action",
       width: 80,
       render: (_: unknown, r: ShiftItem) =>
-        r.status === "OPEN" && can("shifts", "close") ? (
+        r.status === "OPEN" && can("shifts", "manage") ? (
           <Tooltip title="Tutup shift">
             <Button
               size="small"

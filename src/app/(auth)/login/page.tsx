@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Form, Input, Button, Typography, Checkbox, Divider } from "antd";
 import { MailOutlined, LockOutlined } from "@ant-design/icons";
 import Link from "next/link";
+import { WhatsAppOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
 
@@ -143,7 +144,7 @@ function LoginForm() {
             href="/register"
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
           >
-            Daftar Trial Gratis
+            Coba Sekarang
           </Link>
         </Text>
       </div>

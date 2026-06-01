@@ -26,7 +26,7 @@ export function POSClient() {
         <div className="flex-1 min-w-0">
           <ProductGrid />
         </div>
-        <div className="w-[380px] hidden lg:flex flex-col shadow-[-2px_0_12px_rgba(0,0,0,0.04)] dark:shadow-[-2px_0_12px_rgba(0,0,0,0.2)]">
+        <div className="w-[380px] h-full hidden lg:flex flex-col shadow-[-2px_0_12px_rgba(0,0,0,0.04)] dark:shadow-[-2px_0_12px_rgba(0,0,0,0.2)]">
           <CartPanel />
         </div>
       </div>

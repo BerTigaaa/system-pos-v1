@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 import { createOrderSchema } from "./types";
 
@@ -211,7 +211,7 @@ export async function updateOrderItems(
 export async function getOrders(params: { status?: string; page?: number; pageSize?: number }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0 };
-  if (!hasPermission(session.user.role, "orders", "view"))
+  if (!await hasPermissionAsync(session.user.role, "orders", "view"))
     return { success: false, error: { message: "Forbidden" }, data: [], total: 0 };
 
   const { status, page = 1, pageSize = 20 } = params;
@@ -243,7 +243,7 @@ export async function getOrders(params: { status?: string; page?: number; pageSi
 export async function confirmOrder(orderId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "orders", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "orders", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
@@ -279,7 +279,7 @@ export async function confirmOrder(orderId: string) {
 export async function completeOrder(orderId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "orders", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "orders", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
@@ -294,7 +294,7 @@ export async function completeOrder(orderId: string) {
 export async function cancelOrder(orderId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "orders", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "orders", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });

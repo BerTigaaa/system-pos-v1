@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 import { getClientIp } from "@/lib/audit-log";
 import { employeeFormSchema } from "./types";
@@ -13,7 +13,7 @@ import { Prisma } from "@prisma/client";
 export async function getEmployees(params?: { search?: string; role?: string; status?: string }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: [], total: 0 };
-  if (!hasPermission(session.user.role, "employees", "view"))
+  if (!await hasPermissionAsync(session.user.role, "employees", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0 };
 
   const where: Prisma.UserWhereInput = {};
@@ -50,7 +50,7 @@ export async function getEmployees(params?: { search?: string; role?: string; st
 export async function createEmployee(formData: EmployeeFormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "employees", "create"))
+  if (!await hasPermissionAsync(session.user.role, "employees", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const parsed = employeeFormSchema.safeParse(formData);
@@ -98,7 +98,7 @@ export async function createEmployee(formData: EmployeeFormData) {
 export async function updateEmployee(id: string, formData: EmployeeFormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "employees", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "employees", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const parsed = employeeFormSchema.safeParse(formData);
@@ -148,7 +148,7 @@ export async function updateEmployee(id: string, formData: EmployeeFormData) {
 export async function toggleEmployeeActive(id: string, active: boolean) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "employees", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "employees", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const user = await prisma.user.findUnique({ where: { id } });
@@ -187,7 +187,7 @@ export async function toggleEmployeeActive(id: string, active: boolean) {
 export async function resetEmployeePassword(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "employees", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "employees", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const user = await prisma.user.findUnique({ where: { id } });

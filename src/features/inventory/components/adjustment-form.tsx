@@ -43,7 +43,7 @@ export function AdjustmentForm() {
     setSubmitting(false);
   };
 
-  if (!can("inventory", "create")) {
+  if (!can("inventory", "manage")) {
     return <Card className="!border-0 !shadow-sm"><p className="text-gray-400 text-sm">Anda tidak memiliki izin untuk menyesuaikan stok.</p></Card>;
   }
 

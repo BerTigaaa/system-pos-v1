@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { transactionFilterSchema, refundSchema } from "./types";
 import { getClientIp } from "@/lib/audit-log";
 import { Prisma, TransactionStatus, InventoryMovementType } from "@prisma/client";
@@ -29,7 +29,7 @@ export async function getTransactions(params: {
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 20 };
 
-    if (!hasPermission(session.user.role, "transactions", "view"))
+    if (!await hasPermissionAsync(session.user.role, "transactions", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 20 };
 
     const parsed = transactionFilterSchema.safeParse(params);
@@ -99,7 +99,7 @@ export async function getTransactionById(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
 
-  if (!hasPermission(session.user.role, "transactions", "view"))
+  if (!await hasPermissionAsync(session.user.role, "transactions", "view"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const t = await prisma.transaction.findUnique({
@@ -176,7 +176,7 @@ export async function processRefund(formData: RefundFormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
 
-  if (!hasPermission(session.user.role, "refund", "create"))
+  if (!await hasPermissionAsync(session.user.role, "refund", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const parsed = refundSchema.safeParse(formData);
@@ -355,7 +355,7 @@ export async function exportTransactions(params: {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
 
-  if (!hasPermission(session.user.role, "transactions", "view"))
+  if (!await hasPermissionAsync(session.user.role, "transactions", "view"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const transactions = await prisma.transaction.findMany({
@@ -438,7 +438,7 @@ function buildTransactionWhere(params: Record<string, unknown>) {
 export async function getTransactionStats() {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: null };
-  if (!hasPermission(session.user.role, "transactions", "view"))
+  if (!await hasPermissionAsync(session.user.role, "transactions", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: null };
 
   const today = new Date();

@@ -139,8 +139,8 @@ export function ProductTable() {
           className="flex-1 max-w-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
         />
         <div className="flex gap-2">
-          {can("products", "create") && <CategoryManager />}
-          {can("products", "create") && (
+          {can("products", "manage") && <CategoryManager />}
+          {can("products", "manage") && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setDrawerOpen(true); }}>
               Tambah Produk
             </Button>

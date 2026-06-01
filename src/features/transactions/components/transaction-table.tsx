@@ -176,7 +176,7 @@ export function TransactionTable() {
             icon={<EyeOutlined />}
             onClick={() => handleView(r.id)}
           />
-          {can("refund", "create") && r.status === "COMPLETED" && (
+          {can("refund", "manage") && r.status === "COMPLETED" && (
             <Button
               size="small"
               icon={<DollarOutlined />}

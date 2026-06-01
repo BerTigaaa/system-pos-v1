@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Form, Input, InputNumber, Select, Switch, Button, Image } from "antd";
-import { createProduct, updateProduct, getCategories } from "../actions";
+import { useEffect, useState, useRef } from "react";
+import { Form, Input, InputNumber, Select, Switch, Button, Image, Upload, message } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import { createProduct, updateProduct, getCategories, getUploadUrlAction } from "../actions";
 
 type Props = {
   initial?: {
@@ -104,11 +105,47 @@ export function ProductForm({ initial, onSuccess, onCancel }: Props) {
       <Form.Item name="description" label="Deskripsi">
         <Input.TextArea rows={2} placeholder="Opsional" />
       </Form.Item>
-      <Form.Item name="imageUrl" label="URL Gambar">
-        <Input
-          placeholder="https://... (opsional)"
-          onChange={(e) => setImagePreview(e.target.value || null)}
-        />
+      <Form.Item name="imageUrl" label="Gambar">
+        <div className="flex gap-2">
+          <Input
+            placeholder="https://... (opsional)"
+            onChange={(e) => setImagePreview(e.target.value || null)}
+            className="!flex-1"
+          />
+          <Upload
+            accept="image/*"
+            showUploadList={false}
+            customRequest={async ({ file, onSuccess, onError }) => {
+              const res = await getUploadUrlAction();
+              if (!res.success || !res.data) {
+                onError?.(new Error(res.error?.message ?? "Gagal"));
+                return;
+              }
+              const formData = new FormData();
+              formData.append("file", file as Blob);
+              try {
+                const uploadRes = await fetch(res.data.uploadUrl, {
+                  method: "POST",
+                  body: formData,
+                });
+                const uploadJson = await uploadRes.json();
+                if (uploadJson.success) {
+                  const imageUrl = res.data.imageUrl;
+                  form.setFieldsValue({ imageUrl });
+                  setImagePreview(imageUrl);
+                  onSuccess?.(uploadJson);
+                  message.success("Gambar diupload");
+                } else {
+                  onError?.(new Error(uploadJson.errors?.[0]?.message ?? "Upload gagal"));
+                }
+              } catch {
+                onError?.(new Error("Upload gagal"));
+              }
+            }}
+          >
+            <Button icon={<UploadOutlined />}>Upload</Button>
+          </Upload>
+        </div>
       </Form.Item>
       {imagePreview && (
         <div className="mb-4">

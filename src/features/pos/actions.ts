@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 
 export async function getPosProducts(params: {
@@ -62,7 +62,7 @@ export async function createPosOrder(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "pos", "create"))
+  if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const activeShift = await prisma.shift.findFirst({
@@ -244,7 +244,7 @@ export async function getCompletedOrdersByTable(tableNumber: number) {
 export async function updatePosOrderStatus(orderId: string, status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED") {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "pos", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
@@ -299,14 +299,25 @@ export async function getTablesWithCompletedOrders() {
   });
   if (openShifts.length === 0) return { success: true, data: [] };
 
-  const tables = await prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     where: { shiftId: { in: openShifts.map((s) => s.id) }, status: "COMPLETED", paidAt: null },
     select: { tableNumber: true },
     distinct: ["tableNumber"],
     orderBy: { tableNumber: "asc" },
   });
 
-  return { success: true, data: tables.map((t) => t.tableNumber) };
+  const biz = await prisma.businessInfo.findFirst({
+    select: { diningTables: { select: { tableNumber: true, label: true } } },
+  });
+  const labelMap = new Map((biz?.diningTables ?? []).map((t) => [t.tableNumber, t.label]));
+
+  return {
+    success: true,
+    data: orders.map((o) => ({
+      tableNumber: o.tableNumber,
+      label: labelMap.get(o.tableNumber) ?? `Meja ${o.tableNumber}`,
+    })),
+  };
 }
 
 export async function checkout(data: {
@@ -323,7 +334,7 @@ export async function checkout(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "pos", "create"))
+  if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   if (!data.items.length) return { success: false, error: { message: "Keranjang kosong" } };
@@ -346,7 +357,7 @@ export async function checkout(data: {
             distinct: ["tableNumber"],
           }),
           prisma.order.findMany({
-            where: { shiftId: activeShift.id, status: { in: ["PENDING", "CONFIRMED"] } },
+            where: { shiftId: activeShift.id, status: { notIn: ["CANCELLED"] }, paidAt: null },
             select: { tableNumber: true },
             distinct: ["tableNumber"],
           }),

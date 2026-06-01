@@ -2,12 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 
 export async function getDashboardStats() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: null };
-  if (!hasPermission(session.user.role, "dashboard", "view"))
+  if (!await hasPermissionAsync(session.user.role, "dashboard", "view"))
     return { success: false, error: { message: "Forbidden" }, data: null };
 
   const today = new Date();

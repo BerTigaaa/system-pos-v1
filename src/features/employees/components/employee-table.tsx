@@ -77,7 +77,7 @@ export function EmployeeTable() {
       width: 160,
       render: (_: unknown, r: EmployeeItem) => (
         <Space size="small">
-          {can("employees", "edit") && (
+          {can("employees", "manage") && (
             <>
               <Button size="small" icon={<EditOutlined />} onClick={() => { setEditing(r); setFormOpen(true); }} />
               <Popconfirm
@@ -134,7 +134,7 @@ export function EmployeeTable() {
             ]}
           />
         </div>
-        {can("employees", "create") && (
+        {can("employees", "manage") && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setFormOpen(true); }}>
             Tambah Karyawan
           </Button>
