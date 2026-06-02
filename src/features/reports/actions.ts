@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { reportPeriodSchema } from "./types";
 import { Prisma } from "@prisma/client";
 
@@ -11,7 +11,7 @@ export async function getDailySales(date?: string) {
     const session = await auth();
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-    if (!hasPermission(session.user.role, "reports", "view"))
+    if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
     const targetDate = date ? new Date(date) : new Date();
@@ -67,7 +67,7 @@ export async function getMonthlySales(month?: number, year?: number) {
     const session = await auth();
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-    if (!hasPermission(session.user.role, "reports", "view"))
+    if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
     const targetMonth = month ?? new Date().getMonth() + 1;
@@ -120,7 +120,7 @@ export async function getYearlySales(year?: number) {
     const session = await auth();
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-    if (!hasPermission(session.user.role, "reports", "view"))
+    if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
     const targetYear = year ?? new Date().getFullYear();
@@ -182,7 +182,7 @@ export async function getTopProducts(params: {
     const session = await auth();
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-    if (!hasPermission(session.user.role, "reports", "view"))
+    if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
     const where: Prisma.TransactionWhereInput = { status: "COMPLETED" };
@@ -259,7 +259,7 @@ export async function getStockReport(categoryId?: string) {
     const session = await auth();
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-    if (!hasPermission(session.user.role, "reports", "view"))
+    if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
     const where: Prisma.ProductWhereInput = { deletedAt: null };
@@ -308,7 +308,7 @@ export async function getCashierReport(params: {
     const session = await auth();
     if (!session?.user?.id)
       return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-    if (!hasPermission(session.user.role, "reports", "view"))
+    if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
     const where: Prisma.TransactionWhereInput = { status: "COMPLETED" };
@@ -371,7 +371,7 @@ export async function exportReport(params: {
   if (!session?.user?.id)
     return { success: false as const, error: { message: "Unauthorized" } };
 
-  if (!hasPermission(session.user.role, "reports", "export"))
+  if (!await hasPermissionAsync(session.user.role, "reports", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   let rows: Record<string, unknown>[] = [];

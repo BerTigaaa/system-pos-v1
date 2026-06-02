@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   DashboardOutlined, ShoppingCartOutlined,
@@ -18,8 +18,14 @@ import {
 } from "@ant-design/icons";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useUIStore } from "@/store/ui-store";
+import { getBusinessInfo } from "@/features/settings/actions";
 
-type Section = {
+type BusinessInfo = {
+  name: string;
+  logoUrl: string | null;
+};
+
+export type SidebarSection = {
   label: string;
   iconColor: string;
   items: {
@@ -30,7 +36,7 @@ type Section = {
   }[];
 };
 
-const sections: Section[] = [
+export const sidebarSections: SidebarSection[] = [
   {
     label: "Utama",
     iconColor: "text-blue-500",
@@ -82,13 +88,20 @@ export function Sidebar() {
   const { can } = usePermissions();
   const { sidebarOpen, sidebarCollapsed, setSidebarOpen } = useUIStore();
   const collapsed = sidebarCollapsed;
+  const [business, setBusiness] = useState<BusinessInfo | null>(null);
+
+  useEffect(() => {
+    getBusinessInfo().then((res) => {
+      if (res.success && res.data) setBusiness({ name: res.data.name, logoUrl: res.data.logoUrl });
+    });
+  }, []);
 
   const filteredSections = useMemo(
     () =>
-      sections
+      sidebarSections
         .map((section) => ({
           ...section,
-          items: section.items.filter((item) => can(item.module)),
+          items: section.items.filter((item) => can(item.module, "visible")),
         }))
         .filter((section) => section.items.length > 0),
     [can]
@@ -113,13 +126,21 @@ export function Sidebar() {
     <div className="flex flex-col h-full">
       {/* ── Logo ── */}
       <div className={`h-16 flex items-center border-b border-gray-100 dark:border-gray-800/80 ${collapsed ? "justify-center px-0" : "gap-3 px-5"}`}>
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
-          <span className="text-white font-bold text-sm">B</span>
-        </div>
+        {business?.logoUrl ? (
+          <img
+            src={business.logoUrl}
+            alt={business.name}
+            className="w-8 h-8 rounded-xl object-cover shrink-0"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+            <span className="text-white font-bold text-sm">{(business?.name ?? "B")[0]}</span>
+          </div>
+        )}
         {!collapsed && (
           <div className="flex flex-col leading-tight min-w-0">
             <span className="text-sm font-semibold text-gray-900 dark:text-white tracking-tight truncate">
-              BertigaPos
+              {business?.name ?? "BertigaPos"}
             </span>
             <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium tracking-wide">
               POS System

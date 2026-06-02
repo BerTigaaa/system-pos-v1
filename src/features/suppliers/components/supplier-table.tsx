@@ -54,10 +54,10 @@ export function SupplierTable() {
       width: 100,
       render: (_: unknown, r: SupplierItem) => (
         <Space>
-          {can("inventory", "edit") && (
+          {can("inventory", "manage") && (
             <Button size="small" icon={<EditOutlined />} onClick={() => { setEditing(r); setDrawerOpen(true); }} />
           )}
-          {can("inventory", "delete") && (
+          {can("inventory", "manage") && (
             <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(r.id)} />
           )}
         </Space>
@@ -75,7 +75,7 @@ export function SupplierTable() {
           onChange={(e) => { setSearch(e.target.value); load(1, e.target.value); }}
           className="flex-1 max-w-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
         />
-        {can("inventory", "create") && (
+        {can("inventory", "manage") && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setDrawerOpen(true); }}>
             Tambah Supplier
           </Button>

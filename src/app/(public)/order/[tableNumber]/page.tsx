@@ -19,5 +19,11 @@ export default async function OrderPage({ params }: { params: Promise<{ tableNum
     );
   }
 
-  return <OrderPageClient tableNumber={num} businessName={info.name} logoUrl={info.logoUrl} />;
+  const table = await prisma.diningTable.findFirst({
+    where: { businessInfoId: info.id, tableNumber: num },
+  });
+
+  const tableLabel = table?.label || `Meja ${num}`;
+
+  return <OrderPageClient tableNumber={num} tableLabel={tableLabel} businessName={info.name} logoUrl={info.logoUrl} />;
 }

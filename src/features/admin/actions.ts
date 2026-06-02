@@ -2,14 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { getPermissionOverrides, setPermissionOverride, deletePermissionOverride, hasPermissionAsync } from "@/lib/permissions-db";
 import { createAuditLog } from "@/lib/audit-log";
 import { notifyRole } from "@/lib/notifications";
 import type { UserRole } from "@prisma/client";
 
 export async function getAdminStats() {
   const session = await auth();
-  if (!session?.user?.id || !hasPermission(session.user.role, "admin", "view"))
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "view"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const today = new Date();
@@ -57,7 +57,7 @@ export async function getUsers(params: {
   pageSize?: number;
 }) {
   const session = await auth();
-  if (!session?.user?.id || !hasPermission(session.user.role, "admin", "view"))
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 20 };
 
   const { search, role, status, page = 1, pageSize = 20 } = params;
@@ -83,7 +83,7 @@ export async function getUsers(params: {
 
 export async function toggleUserStatus(userId: string) {
   const session = await auth();
-  if (!session?.user?.id || !hasPermission(session.user.role, "admin", "edit"))
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, status: true } });
@@ -114,7 +114,7 @@ export async function toggleUserStatus(userId: string) {
 
 export async function updateUserRole(userId: string, role: UserRole) {
   const session = await auth();
-  if (!session?.user?.id || !hasPermission(session.user.role, "admin", "edit"))
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
@@ -141,7 +141,7 @@ export async function updateUserRole(userId: string, role: UserRole) {
 
 export async function getSystemInfo() {
   const session = await auth();
-  if (!session?.user?.id || !hasPermission(session.user.role, "admin", "view"))
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "view"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   const [userCount, activeSessions] = await Promise.all([
@@ -162,4 +162,54 @@ export async function getSystemInfo() {
       lastMigration: "Phase 3",
     },
   };
+}
+
+export async function getRolePermissions(role: string) {
+  const session = await auth();
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "manage"))
+    return { success: false as const, error: { message: "Forbidden" } };
+
+  const overrides = await getPermissionOverrides(role as UserRole);
+  return { success: true as const, data: overrides };
+}
+
+export async function updateRolePermission(
+  role: string,
+  module: string,
+  actions: string[]
+) {
+  const session = await auth();
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "manage"))
+    return { success: false as const, error: { message: "Forbidden" } };
+
+  if (role === "SUPER_ADMIN")
+    return { success: false as const, error: { message: "SUPER_ADMIN permissions are fixed" } };
+
+  await setPermissionOverride(role as UserRole, module, actions);
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "UPDATE",
+    module: "admin",
+    description: `Updated ${role} permissions for ${module}: [${actions.join(", ")}]`,
+  });
+
+  return { success: true as const };
+}
+
+export async function resetRolePermission(role: string, module: string) {
+  const session = await auth();
+  if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "manage"))
+    return { success: false as const, error: { message: "Forbidden" } };
+
+  await deletePermissionOverride(role as UserRole, module);
+
+  await createAuditLog({
+    userId: session.user.id,
+    action: "UPDATE",
+    module: "admin",
+    description: `Reset ${role} permissions for ${module} to default`,
+  });
+
+  return { success: true as const };
 }

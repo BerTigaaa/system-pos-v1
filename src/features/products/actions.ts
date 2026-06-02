@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { productSchema, categorySchema } from "./types";
-import { hasPermission } from "@/lib/permissions";
+import { createUploadUrl, getImageUrl } from "@/lib/cloudflare-images";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { auth } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit-log";
 import { notifyRole } from "@/lib/notifications";
@@ -17,7 +18,7 @@ export async function getProducts(params: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
-  if (!hasPermission(session.user.role, "products", "view"))
+  if (!await hasPermissionAsync(session.user.role, "products", "view"))
     return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
 
   const { search, categoryId, isActive, page = 1, pageSize = 10 } = params;
@@ -54,7 +55,7 @@ export async function getProducts(params: {
 export async function getProductById(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "view"))
+  if (!await hasPermissionAsync(session.user.role, "products", "view"))
     return { success: false, error: { message: "Forbidden" } };
 
   const p = await prisma.product.findUnique({
@@ -71,7 +72,7 @@ export async function getProductById(id: string) {
 export async function createProduct(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "create"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = productSchema.safeParse(Object.fromEntries(formData));
@@ -109,7 +110,7 @@ export async function createProduct(formData: FormData) {
 export async function updateProduct(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = productSchema.safeParse(Object.fromEntries(formData));
@@ -155,7 +156,7 @@ export async function updateProduct(id: string, formData: FormData) {
 export async function deleteProduct(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "delete"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const txCount = await prisma.transactionItem.count({ where: { productId: id } });
@@ -188,7 +189,7 @@ export async function deleteProduct(id: string) {
 export async function toggleProductActive(id: string, isActive: boolean) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const p = await prisma.product.findUnique({ where: { id }, select: { name: true } });
@@ -229,7 +230,7 @@ export async function getCategories() {
 export async function createCategory(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "create"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
@@ -251,7 +252,7 @@ export async function createCategory(formData: FormData) {
 export async function updateCategory(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
@@ -273,7 +274,7 @@ export async function updateCategory(id: string, formData: FormData) {
 export async function deleteCategory(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "products", "delete"))
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const count = await prisma.product.count({ where: { categoryId: id, deletedAt: null } });
@@ -292,4 +293,25 @@ export async function deleteCategory(id: string) {
 
   revalidatePath("/products");
   return { success: true };
+}
+
+export async function getUploadUrlAction() {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
+  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
+    return { success: false as const, error: { message: "Forbidden" } };
+
+  const res = await createUploadUrl();
+  if (!res.success) return { success: false as const, error: { message: res.error.message } };
+
+  const imageUrl = getImageUrl(res.data.imageId);
+  if (!imageUrl) return { success: false as const, error: { message: "Cloudflare Images not configured" } };
+
+  return {
+    success: true as const,
+    data: {
+      uploadUrl: res.data.uploadUrl,
+      imageUrl,
+    },
+  };
 }

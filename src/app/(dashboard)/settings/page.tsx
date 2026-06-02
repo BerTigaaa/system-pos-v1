@@ -3,16 +3,15 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, Switch, Button, Form, Input, Spin, QRCode, Tabs } from "antd";
 import { SettingOutlined, TableOutlined, PlusOutlined, MinusOutlined, PrinterOutlined, DollarOutlined, FileTextOutlined, UserOutlined } from "@ant-design/icons";
-import { getBusinessInfo, updateBusinessInfo, saveSelfOrderSettings, saveTableSettings } from "@/features/settings/actions";
+import { getBusinessInfo, updateBusinessInfo, saveSelfOrderSettings, saveTableSettings, updateTableLabel } from "@/features/settings/actions";
 import { TaxSettings } from "@/features/settings/components/tax-settings";
 import { ReceiptSettings } from "@/features/settings/components/receipt-settings";
 import { useToast } from "@/components/ui/toast";
-import { usePermissions } from "@/hooks/use-permissions";
 
-type DiningTable = { id: string; tableNumber: number; isActive: boolean };
+type DiningTable = { id: string; tableNumber: number; label: string; isActive: boolean };
 type BusinessData = {
   id: string; name: string; ownerName: string; address: string | null;
-  phone: string | null; email: string | null; selfOrderEnabled: boolean; totalTables: number;
+  phone: string | null; email: string | null; logoUrl: string | null; selfOrderEnabled: boolean; totalTables: number;
   diningTables: DiningTable[];
 };
 
@@ -20,11 +19,8 @@ export default function SettingsPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [savingBiz, setSavingBiz] = useState(false);
-  const [savingSO, setSavingSO] = useState(false);
-  const [savingTable, setSavingTable] = useState(false);
   const [savedData, setSavedData] = useState<BusinessData | null>(null);
   const [bizInit, setBizInit] = useState<Record<string, unknown> | null>(null);
-  const [soInit, setSoInit] = useState<Record<string, unknown> | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
 
   useEffect(() => {
@@ -43,10 +39,7 @@ export default function SettingsPage() {
         address: d.address ?? "",
         phone: d.phone ?? "",
         email: d.email ?? "",
-      });
-      setSoInit({
-        selfOrderEnabled: d.selfOrderEnabled ?? false,
-        totalTables: d.totalTables ?? 0,
+        logoUrl: d.logoUrl ?? "",
       });
     }
     setLoading(false);
@@ -62,6 +55,7 @@ export default function SettingsPage() {
       address: (values.address as string) ?? "",
       phone: (values.phone as string) ?? "",
       email: (values.email as string) ?? "",
+      logoUrl: (values.logoUrl as string) ?? "",
     });
     setSavingBiz(false);
     if (res.success) {
@@ -71,38 +65,9 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveSO = async (values: Record<string, unknown>) => {
-    setSavingSO(true);
-    const res = await saveSelfOrderSettings({
-      selfOrderEnabled: values.selfOrderEnabled as boolean,
-    });
-    setSavingSO(false);
-    if (res.success) {
-      toast.success("Pengaturan pemesanan disimpan");
-      load();
-    } else {
-      toast.error(res.error?.message ?? "Gagal menyimpan");
-    }
-  };
-
-  const handleSaveTable = async (values: Record<string, unknown>) => {
-    setSavingTable(true);
-    const res = await saveTableSettings({
-      totalTables: values.totalTables as number,
-    });
-    setSavingTable(false);
-    if (res.success) {
-      toast.success("Jumlah meja diperbarui");
-      load();
-    } else {
-      toast.error(res.error?.message ?? "Gagal menyimpan");
-    }
-  };
-
   if (loading) return <div className="flex justify-center py-24"><Spin size="large" /></div>;
 
-  const soValues = soInit as { selfOrderEnabled: boolean; totalTables: number } | null;
-  const selfOrderEnabled = soValues?.selfOrderEnabled ?? false;
+  const selfOrderEnabled = savedData?.selfOrderEnabled ?? false;
   const totalTables = savedData?.totalTables ?? 0;
   const tables = (savedData?.diningTables ?? []).filter((t) => t.tableNumber <= totalTables);
 
@@ -137,6 +102,18 @@ export default function SettingsPage() {
                   <Form.Item label="Email" name="email">
                     <Input type="email" />
                   </Form.Item>
+                  <Form.Item label="Logo URL" name="logoUrl">
+                    <div className="flex gap-2">
+                      <Input placeholder="https://example.com/logo.png" />
+                      {!!bizInit?.logoUrl && (
+                        <img
+                          src={bizInit.logoUrl as string}
+                          alt="Preview"
+                          className="w-10 h-10 rounded-lg object-cover border"
+                        />
+                      )}
+                    </div>
+                  </Form.Item>
                   <div className="flex justify-end">
                     <Button type="primary" htmlType="submit" loading={savingBiz}>
                       Simpan Informasi Bisnis
@@ -170,19 +147,17 @@ export default function SettingsPage() {
             children: (
               <>
                 <Card title="Self-Order" className="mb-6">
-                  {soInit && (
-                    <SelfOrderForm
-                      key={JSON.stringify(soInit)}
-                      initialValues={soInit as { selfOrderEnabled: boolean; totalTables: number }}
-                      baseUrl={baseUrl}
-                      savedData={savedData}
-                      onSave={handleSaveSO}
-                      saving={savingSO}
-                    />
-                  )}
+                  <SelfOrderForm
+                    baseUrl={baseUrl}
+                    savedData={savedData}
+                    selfOrderEnabled={selfOrderEnabled}
+                    totalTables={totalTables}
+                    tables={tables}
+                    onDataChanged={load}
+                  />
                 </Card>
                 <Card title="Jumlah Meja">
-                  <TableForm totalTables={totalTables} onSave={handleSaveTable} saving={savingTable} />
+                  <TableCountForm totalTables={totalTables} onDataChanged={load} />
                 </Card>
               </>
             ),
@@ -205,69 +180,64 @@ export default function SettingsPage() {
   );
 }
 
-function TableForm({
-  totalTables,
-  onSave,
-  saving,
-}: {
-  totalTables: number;
-  onSave: (values: Record<string, unknown>) => Promise<void>;
-  saving: boolean;
-}) {
-  const [form] = Form.useForm();
-  const tableCount = Form.useWatch("totalTables", form) ?? totalTables;
-
-  return (
-    <Form form={form} layout="vertical" initialValues={{ totalTables }} onFinish={onSave}>
-      <div className="mb-4">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Jumlah Meja</label>
-        <div className="flex items-center gap-2">
-          <Button
-            htmlType="button"
-            icon={<MinusOutlined />}
-            disabled={tableCount <= 0}
-            onClick={() => form.setFieldsValue({ totalTables: Math.max(0, tableCount - 1) })}
-          />
-          <span className="text-lg font-bold tabular-nums w-8 text-center">{tableCount}</span>
-          <Button
-            htmlType="button"
-            icon={<PlusOutlined />}
-            disabled={tableCount >= 99}
-            onClick={() => form.setFieldsValue({ totalTables: Math.min(99, tableCount + 1) })}
-          />
-        </div>
-      </div>
-      <Form.Item name="totalTables" hidden>
-        <Input />
-      </Form.Item>
-      <div className="flex justify-end pt-4 border-t border-gray-100">
-        <Button type="primary" htmlType="submit" loading={saving}>
-          Simpan Jumlah Meja
-        </Button>
-      </div>
-    </Form>
-  );
-}
-
 function SelfOrderForm({
-  initialValues,
   baseUrl,
   savedData,
-  onSave,
-  saving,
+  selfOrderEnabled,
+  totalTables,
+  tables,
+  onDataChanged,
 }: {
-  initialValues: { selfOrderEnabled: boolean; totalTables: number };
   baseUrl: string;
   savedData: BusinessData | null;
-  onSave: (values: Record<string, unknown>) => Promise<void>;
-  saving: boolean;
+  selfOrderEnabled: boolean;
+  totalTables: number;
+  tables: DiningTable[];
+  onDataChanged: () => Promise<void>;
 }) {
-  const [form] = Form.useForm();
+  const toast = useToast();
   const printRef = useRef<HTMLDivElement>(null);
+  const [enabled, setEnabled] = useState(selfOrderEnabled);
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [savingLabels, setSavingLabels] = useState(false);
 
-  const selfOrderEnabled = Form.useWatch("selfOrderEnabled", form) ?? initialValues.selfOrderEnabled;
-  const totalTables = savedData?.totalTables ?? 0;
-  const tables = (savedData?.diningTables ?? []).filter((t) => t.tableNumber <= totalTables);
+  useEffect(() => {
+    setEnabled(selfOrderEnabled);
+  }, [selfOrderEnabled]);
+
+  useEffect(() => {
+    const init: Record<string, string> = {};
+    tables.forEach((t) => { init[t.id] = t.label; });
+    setLabels(init);
+  }, [tables]);
+
+  const handleToggle = async (v: boolean) => {
+    setEnabled(v);
+    const res = await saveSelfOrderSettings({ selfOrderEnabled: v });
+    if (res.success) {
+      toast.success(v ? "Pemesanan mandiri diaktifkan" : "Pemesanan mandiri dinonaktifkan");
+      onDataChanged();
+    } else {
+      toast.error(res.error?.message ?? "Gagal");
+      setEnabled(!v);
+    }
+  };
+
+  const handleSaveLabels = async () => {
+    setSavingLabels(true);
+    const entries = Object.entries(labels);
+    const results = await Promise.allSettled(
+      entries.map(([id, label]) => updateTableLabel(id, label))
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setSavingLabels(false);
+    if (failed === 0) {
+      toast.success("Semua label disimpan");
+      onDataChanged();
+    } else {
+      toast.error(`${failed} label gagal disimpan`);
+    }
+  };
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -290,8 +260,8 @@ function SelfOrderForm({
         <div class="grid">
         ${tables.map((t) => `
           <div class="card">
-            <img src="${process.env.NEXT_PUBLIC_QR_API_URL}?size=150x150&data=${encodeURIComponent(`${baseUrl}/order/${t.tableNumber}`)}" alt="Meja ${t.tableNumber}" width="120" height="120" />
-            <div class="label">Meja ${t.tableNumber}</div>
+            <img src="${process.env.NEXT_PUBLIC_QR_API_URL}?size=150x150&data=${encodeURIComponent(`${baseUrl}/order/${t.tableNumber}`)}" alt="${t.label || `Meja ${t.tableNumber}`}" width="120" height="120" />
+            <div class="label">${t.label || `Meja ${t.tableNumber}`}</div>
           </div>`).join("")}
         </div>
         <p class="no-print" style="margin-top:20px;color:#999;font-size:11px;">${baseUrl}</p>
@@ -303,30 +273,50 @@ function SelfOrderForm({
   };
 
   return (
-    <Form form={form} layout="vertical" initialValues={initialValues} onFinish={onSave}>
-      <Form.Item name="selfOrderEnabled" valuePropName="checked" hidden>
-        <Switch />
-      </Form.Item>
-
-      <div className="flex items-center justify-between mb-4">
+    <div>
+      {/* Toggle Self-Order */}
+      <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">Aktifkan Pemesanan Mandiri</p>
           <p className="text-xs text-gray-500">Pelanggan dapat memesan dari meja masing-masing</p>
         </div>
-        <Switch
-          checked={selfOrderEnabled}
-          onChange={(v) => {
-            form.setFieldsValue({ selfOrderEnabled: v });
-          }}
-        />
+        <Switch checked={enabled} onChange={handleToggle} />
       </div>
 
-      {selfOrderEnabled && (
+      {enabled && (
         <>
-          {totalTables > 0 && (
-            <div className="mt-4">
+          {/* Label Meja */}
+          {tables.length > 0 && (
+            <div className="mb-6">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Label Meja</label>
+              <div className="space-y-2 mb-4">
+                {tables.map((t) => (
+                  <div key={t.id} className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-500 w-20 shrink-0">
+                      Meja {t.tableNumber}
+                    </span>
+                    <Input
+                      value={labels[t.id] ?? ""}
+                      onChange={(e) => setLabels((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                      placeholder="Label meja"
+                      className="!flex-1"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <Button type="primary" htmlType="button" loading={savingLabels} onClick={handleSaveLabels}>
+                  Simpan Label
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* QR Code */}
+          {tables.length > 0 && (
+            <div className="mb-6 pb-6 border-b border-gray-100">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-medium text-gray-500">Tabel Meja — QR Code</p>
+                <p className="text-xs font-medium text-gray-500">QR Code Meja</p>
                 <Button
                   htmlType="button"
                   size="small"
@@ -337,28 +327,78 @@ function SelfOrderForm({
                   Cetak QR
                 </Button>
               </div>
-
               <div ref={printRef} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {tables.map((t) => (
                   <div key={t.id} className="flex flex-col items-center p-3 rounded-xl border border-gray-100 bg-gray-50">
                     <QRCode value={`${baseUrl}/order/${t.tableNumber}`} size={100} bordered={false} />
-                    <p className="text-xs font-medium text-gray-600 mt-2">Meja {t.tableNumber}</p>
+                    <p className="text-xs font-medium text-gray-600 mt-2">{t.label || `Meja ${t.tableNumber}`}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
+
           {totalTables === 0 && (
-            <p className="text-sm text-gray-400 italic mb-4">Tidak ada meja. Atur jumlah meja terlebih dahulu di bagian "Meja".</p>
+            <p className="text-sm text-gray-400 italic">Belum ada meja. Atur jumlah meja terlebih dahulu.</p>
           )}
         </>
       )}
-
-      <div className="flex justify-end pt-4 border-t border-gray-100">
-        <Button type="primary" htmlType="submit" loading={saving}>
-          Simpan Pengaturan Pemesanan
-        </Button>
-      </div>
-    </Form>
+    </div>
   );
 }
+
+function TableCountForm({
+  totalTables,
+  onDataChanged,
+}: {
+  totalTables: number;
+  onDataChanged: () => Promise<void>;
+}) {
+  const toast = useToast();
+  const [tableCount, setTableCount] = useState(totalTables);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTableCount(totalTables);
+  }, [totalTables]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const res = await saveTableSettings({ totalTables: tableCount });
+    setSaving(false);
+    if (res.success) {
+      toast.success("Jumlah meja diperbarui");
+      onDataChanged();
+    } else {
+      toast.error(res.error?.message ?? "Gagal");
+    }
+  };
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Jumlah Meja</label>
+      <div className="flex items-center gap-2 mb-4">
+        <Button
+          htmlType="button"
+          icon={<MinusOutlined />}
+          disabled={tableCount <= 0 || saving}
+          onClick={() => setTableCount(Math.max(0, tableCount - 1))}
+        />
+        <span className="text-lg font-bold tabular-nums w-8 text-center">{tableCount}</span>
+        <Button
+          htmlType="button"
+          icon={<PlusOutlined />}
+          disabled={tableCount >= 99 || saving}
+          onClick={() => setTableCount(Math.min(99, tableCount + 1))}
+        />
+      </div>
+      <div className="flex justify-end">
+        <Button type="primary" htmlType="button" loading={saving} onClick={handleSave}>
+          Simpan Jumlah Meja
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { supplierSchema } from "./types";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 
 export async function getSuppliers(params: { search?: string; page?: number; pageSize?: number }) {
@@ -37,7 +37,7 @@ export async function getSuppliers(params: { search?: string; page?: number; pag
 export async function createSupplier(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "suppliers", "create"))
+  if (!await hasPermissionAsync(session.user.role, "suppliers", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = supplierSchema.safeParse(Object.fromEntries(formData));
@@ -62,7 +62,7 @@ export async function createSupplier(formData: FormData) {
 export async function updateSupplier(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "suppliers", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "suppliers", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = supplierSchema.safeParse(Object.fromEntries(formData));
@@ -86,7 +86,7 @@ export async function updateSupplier(id: string, formData: FormData) {
 export async function deleteSupplier(id: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "suppliers", "delete"))
+  if (!await hasPermissionAsync(session.user.role, "suppliers", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const supplier = await prisma.supplier.findUnique({ where: { id }, select: { name: true } });

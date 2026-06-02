@@ -1,87 +1,91 @@
 import { UserRole } from "@prisma/client";
 
-export type ModuleAction = "view" | "create" | "edit" | "delete" | "close" | "export";
+export type ModuleAction = "view" | "manage" | "visible";
 
 type PermissionMap = Record<string, UserRole[]>;
 
 const modulePermissions: Record<string, PermissionMap> = {
   dashboard: {
     view: ["SUPER_ADMIN", "OWNER", "FINANCE", "WAREHOUSE", "CASHIER"],
+    visible: ["SUPER_ADMIN", "OWNER", "FINANCE", "WAREHOUSE", "CASHIER"],
   },
   pos: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    edit: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    manage: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    visible: ["SUPER_ADMIN", "OWNER", "CASHIER"],
   },
   products: {
     view: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    create: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    edit: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    delete: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
+    visible: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
   },
   inventory: {
     view: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    create: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    edit: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    delete: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
+    visible: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
   },
   transactions: {
     view: ["SUPER_ADMIN", "OWNER", "FINANCE", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    manage: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    visible: ["SUPER_ADMIN", "OWNER", "FINANCE", "CASHIER"],
   },
   refund: {
     view: ["SUPER_ADMIN", "OWNER"],
-    create: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER"],
+    visible: ["SUPER_ADMIN", "OWNER"],
   },
   finance: {
     view: ["SUPER_ADMIN", "OWNER", "FINANCE"],
-    create: ["SUPER_ADMIN", "OWNER", "FINANCE"],
-    edit: ["SUPER_ADMIN", "OWNER"],
-    delete: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER", "FINANCE"],
+    visible: ["SUPER_ADMIN", "OWNER", "FINANCE"],
   },
   reports: {
     view: ["SUPER_ADMIN", "OWNER", "FINANCE"],
-    export: ["SUPER_ADMIN", "OWNER", "FINANCE"],
+    manage: ["SUPER_ADMIN", "OWNER", "FINANCE"],
+    visible: ["SUPER_ADMIN", "OWNER", "FINANCE"],
   },
   settings: {
     view: ["SUPER_ADMIN", "OWNER"],
-    edit: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER"],
+    visible: ["SUPER_ADMIN", "OWNER"],
   },
   employees: {
     view: ["SUPER_ADMIN", "OWNER"],
-    create: ["SUPER_ADMIN", "OWNER"],
-    edit: ["SUPER_ADMIN", "OWNER"],
-    delete: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER"],
+    visible: ["SUPER_ADMIN", "OWNER"],
   },
   audit: {
     view: ["SUPER_ADMIN", "OWNER"],
+    visible: ["SUPER_ADMIN", "OWNER"],
   },
   shifts: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    close: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    manage: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    visible: ["SUPER_ADMIN", "OWNER", "CASHIER"],
   },
   suppliers: {
     view: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    create: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    edit: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
-    delete: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
+    visible: ["SUPER_ADMIN", "OWNER", "WAREHOUSE"],
   },
   orders: {
     view: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    create: ["SUPER_ADMIN", "OWNER", "CASHIER"],
-    edit: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER", "CASHIER"],
+    visible: ["SUPER_ADMIN", "OWNER", "CASHIER"],
   },
   selfOrder: {
     view: ["SUPER_ADMIN", "OWNER"],
     manage: ["SUPER_ADMIN"],
+    visible: ["SUPER_ADMIN", "OWNER"],
   },
   admin: {
     view: ["SUPER_ADMIN", "OWNER"],
-    edit: ["SUPER_ADMIN", "OWNER"],
+    manage: ["SUPER_ADMIN", "OWNER"],
+    visible: ["SUPER_ADMIN", "OWNER"],
   },
   notifications: {
     view: ["SUPER_ADMIN", "OWNER", "FINANCE", "CASHIER", "WAREHOUSE"],
+    visible: ["SUPER_ADMIN", "OWNER", "FINANCE", "CASHIER", "WAREHOUSE"],
   },
 };
 
@@ -99,8 +103,4 @@ export function hasPermission(
   if (!allowedRoles) return false;
 
   return allowedRoles.includes(role);
-}
-
-export function canAccessModule(role: UserRole, module: string): boolean {
-  return hasPermission(role, module, "view");
 }

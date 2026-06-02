@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { openShiftSchema, closeShiftSchema } from "./types";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 
 export async function getActiveShift() {
@@ -41,7 +41,7 @@ export async function getShiftList(params: {
   const session = await auth();
   if (!session?.user?.id)
     return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
-  if (!hasPermission(session.user.role, "shifts", "view"))
+  if (!await hasPermissionAsync(session.user.role, "shifts", "view"))
     return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
 
   const { search, page = 1, pageSize = 10 } = params;
@@ -93,7 +93,7 @@ export async function getShiftList(params: {
 export async function openShift(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "shifts", "create"))
+  if (!await hasPermissionAsync(session.user.role, "shifts", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const active = await prisma.shift.findFirst({
@@ -128,7 +128,7 @@ export async function openShift(formData: FormData) {
 export async function closeShift(shiftId: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "shifts", "close"))
+  if (!await hasPermissionAsync(session.user.role, "shifts", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const parsed = closeShiftSchema.safeParse(Object.fromEntries(formData));

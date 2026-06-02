@@ -142,7 +142,7 @@ export function CashFlowList({ flowType }: { flowType: "IN" | "OUT" }) {
       key: "user",
       width: 130,
     },
-    ...(can("finance", "edit") || can("finance", "delete")
+    ...(can("finance", "manage") || can("finance", "manage")
       ? [
           {
             title: "Aksi",
@@ -150,10 +150,10 @@ export function CashFlowList({ flowType }: { flowType: "IN" | "OUT" }) {
             width: 100,
             render: (_: unknown, r: CashFlowItem) => (
               <Space size="small">
-                {can("finance", "edit") && (
+                {can("finance", "manage") && (
                   <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
                 )}
-                {can("finance", "delete") && (
+                {can("finance", "manage") && (
                   <Popconfirm title="Hapus data ini?" onConfirm={() => handleDelete(r.id)}>
                     <Button size="small" danger icon={<DeleteOutlined />} />
                   </Popconfirm>
@@ -188,7 +188,7 @@ export function CashFlowList({ flowType }: { flowType: "IN" | "OUT" }) {
             }}
           />
         </div>
-        {can("finance", "create") && (
+        {can("finance", "manage") && (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             Tambah {flowType === "IN" ? "Kas Masuk" : "Kas Keluar"}
           </Button>

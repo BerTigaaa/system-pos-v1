@@ -108,12 +108,12 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
               />
             ) : null}
 
-            {!active && can("shifts", "create") && (
+            {!active && can("shifts", "manage") && (
               <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => setOpenModal(true)}>
                 Buka Shift
               </Button>
             )}
-            {active && can("shifts", "close") && (
+            {active && can("shifts", "manage") && (
               <Button danger icon={<StopOutlined />} onClick={() => setCloseModal(true)}>
                 Tutup Shift
               </Button>

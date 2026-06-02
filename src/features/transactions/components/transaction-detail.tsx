@@ -126,7 +126,7 @@ export function TransactionDetail({
       size={640}
       extra={
         <Space>
-          {can("refund", "create") && data?.status === "COMPLETED" && (
+          {can("refund", "manage") && data?.status === "COMPLETED" && (
             <Button icon={<DollarOutlined />} onClick={handleRefund}>
               Refund
             </Button>

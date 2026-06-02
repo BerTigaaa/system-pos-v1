@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit-log";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 
 export async function getMovements(params: {
@@ -15,7 +15,7 @@ export async function getMovements(params: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
-  if (!hasPermission(session.user.role, "inventory", "view"))
+  if (!await hasPermissionAsync(session.user.role, "inventory", "view"))
     return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
 
   const { search, type, page = 1, pageSize = 10 } = params;
@@ -70,7 +70,7 @@ export async function getMovements(params: {
 export async function adjustStock(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "inventory", "create"))
+  if (!await hasPermissionAsync(session.user.role, "inventory", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const productId = formData.get("productId") as string;
@@ -142,7 +142,7 @@ export async function adjustStock(formData: FormData) {
 export async function getStockOpnameList(params: { page?: number; pageSize?: number }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 10 };
-  if (!hasPermission(session.user.role, "inventory", "view"))
+  if (!await hasPermissionAsync(session.user.role, "inventory", "view"))
     return { success: false, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 10 };
 
   const { page = 1, pageSize = 10 } = params;
@@ -166,7 +166,7 @@ export async function getStockOpnameList(params: { page?: number; pageSize?: num
 export async function createStockOpname(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "inventory", "create"))
+  if (!await hasPermissionAsync(session.user.role, "inventory", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const rawItems = formData.getAll("items") as string[];
@@ -221,7 +221,7 @@ export async function createStockOpname(formData: FormData) {
 export async function applyStockOpname(opnameId: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "inventory", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "inventory", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const opname = await prisma.stockOpname.findUnique({

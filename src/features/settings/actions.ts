@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { notifyRole } from "@/lib/notifications";
 
 export async function getBusinessInfo() {
@@ -19,10 +19,11 @@ export async function updateBusinessInfo(data: {
   address?: string;
   phone?: string;
   email?: string;
+  logoUrl?: string;
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "settings", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "settings", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const existing = await prisma.businessInfo.findFirst();
@@ -36,6 +37,7 @@ export async function updateBusinessInfo(data: {
       address: data.address ?? null,
       phone: data.phone ?? null,
       email: data.email ?? null,
+      logoUrl: data.logoUrl?.trim() || null,
     },
   });
 
@@ -55,7 +57,7 @@ export async function saveSelfOrderSettings(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "settings", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "settings", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const existing = await prisma.businessInfo.findFirst();
@@ -80,7 +82,7 @@ export async function saveSelfOrderSettings(data: {
 export async function saveTableSettings(data: { totalTables: number }) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "settings", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "settings", "manage"))
     return { success: false, error: { message: "Forbidden" } };
 
   const existing = await prisma.businessInfo.findFirst();
@@ -111,7 +113,11 @@ export async function saveTableSettings(data: { totalTables: number }) {
 
     if (toCreate.length > 0) {
       await tx.diningTable.createMany({
-        data: toCreate.map((num) => ({ businessInfoId: existing.id, tableNumber: num })),
+        data: toCreate.map((num) => ({
+          businessInfoId: existing.id,
+          tableNumber: num,
+          label: `Meja ${num}`,
+        })),
       });
     }
   });
@@ -121,6 +127,23 @@ export async function saveTableSettings(data: { totalTables: number }) {
     title: "Jumlah Meja Diubah",
     message: `Jumlah meja diubah menjadi ${data.totalTables}.`,
     data: { section: "tables", totalTables: data.totalTables },
+  });
+
+  revalidatePath("/settings");
+  return { success: true };
+}
+
+export async function updateTableLabel(id: string, label: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+  if (!await hasPermissionAsync(session.user.role, "settings", "manage"))
+    return { success: false, error: { message: "Forbidden" } };
+
+  const trimmed = label.trim().slice(0, 50);
+
+  await prisma.diningTable.update({
+    where: { id },
+    data: { label: trimmed },
   });
 
   revalidatePath("/settings");
@@ -139,18 +162,28 @@ export async function getAvailableTables() {
   const activeShift = await prisma.shift.findFirst({
     where: { userId: session.user.id, status: "OPEN" },
   });
-  if (!activeShift) return { success: true, data: Array.from({ length: info.totalTables }, (_, i) => i + 1).map((num) => ({ tableNumber: num, isAvailable: true })) };
+  if (!activeShift) {
+    const allTables = await prisma.diningTable.findMany({
+      where: { businessInfoId: info.id },
+      orderBy: { tableNumber: "asc" },
+    });
+    return { success: true, data: allTables.map((t) => ({ tableNumber: t.tableNumber, label: t.label || `Meja ${t.tableNumber}`, isAvailable: true })) };
+  }
 
-  const [occupiedByTransaction, occupiedByOrder] = await Promise.all([
+  const [occupiedByTransaction, occupiedByOrder, diningTables] = await Promise.all([
     prisma.transaction.findMany({
       where: { shiftId: activeShift.id, tableNumber: { not: null }, status: { not: "COMPLETED" } },
       select: { tableNumber: true },
       distinct: ["tableNumber"],
     }),
     prisma.order.findMany({
-      where: { shiftId: activeShift.id, status: { in: ["PENDING", "CONFIRMED"] } },
+      where: { shiftId: activeShift.id, status: { notIn: ["CANCELLED"] }, paidAt: null },
       select: { tableNumber: true },
       distinct: ["tableNumber"],
+    }),
+    prisma.diningTable.findMany({
+      where: { businessInfoId: info.id },
+      select: { tableNumber: true, label: true },
     }),
   ]);
   const occupiedNumbers = [
@@ -158,11 +191,13 @@ export async function getAvailableTables() {
     ...occupiedByOrder.map((o) => o.tableNumber).filter((n): n is number => n !== null),
   ];
 
-  const tables = Array.from({ length: info.totalTables }, (_, i) => i + 1);
+  const labelMap = new Map(diningTables.map((t) => [t.tableNumber, t.label]));
+
   return {
     success: true,
-    data: tables.map((num) => ({
+    data: Array.from({ length: info.totalTables }, (_, i) => i + 1).map((num) => ({
       tableNumber: num,
+      label: labelMap.get(num) ?? `Meja ${num}`,
       isAvailable: !occupiedNumbers.includes(num),
     })),
   };
@@ -171,7 +206,7 @@ export async function getAvailableTables() {
 export async function getSettings() {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: {} };
-  if (!hasPermission(session.user.role, "settings", "view"))
+  if (!await hasPermissionAsync(session.user.role, "settings", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: {} };
 
   const settings = await prisma.setting.findMany();
@@ -185,7 +220,7 @@ export async function getSettings() {
 export async function saveSetting(key: string, value: string) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!hasPermission(session.user.role, "settings", "edit"))
+  if (!await hasPermissionAsync(session.user.role, "settings", "manage"))
     return { success: false as const, error: { message: "Forbidden" } };
 
   await prisma.setting.upsert({

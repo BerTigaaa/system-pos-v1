@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermissionAsync } from "@/lib/permissions-db";
 import { Prisma } from "@prisma/client";
 
 export async function getAuditLogs(params: {
@@ -18,7 +18,7 @@ export async function getAuditLogs(params: {
   if (!session?.user?.id)
     return { success: false as const, error: { message: "Unauthorized" }, data: [], total: 0, page: 1, pageSize: 20 };
 
-  if (!hasPermission(session.user.role, "audit", "view"))
+  if (!await hasPermissionAsync(session.user.role, "audit", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: [], total: 0, page: 1, pageSize: 20 };
 
   const { userId, module, dateFrom, dateTo, search, page = 1, pageSize = 20 } = params;
@@ -69,7 +69,7 @@ export async function getAuditLogs(params: {
 export async function getAuditLogModules() {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" }, data: [] };
-  if (!hasPermission(session.user.role, "audit", "view"))
+  if (!await hasPermissionAsync(session.user.role, "audit", "view"))
     return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
   const modules = await prisma.auditLog.groupBy({
