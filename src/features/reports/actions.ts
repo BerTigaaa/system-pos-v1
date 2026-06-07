@@ -254,7 +254,7 @@ export async function getTopProducts(params: {
   }
 }
 
-export async function getStockReport(categoryId?: string) {
+export async function getStockReport(category?: string) {
   try {
     const session = await auth();
     if (!session?.user?.id)
@@ -262,16 +262,15 @@ export async function getStockReport(categoryId?: string) {
     if (!await hasPermissionAsync(session.user.role, "reports", "view"))
       return { success: false as const, error: { message: "Forbidden" }, data: [] };
 
-    const where: Prisma.ProductWhereInput = { deletedAt: null };
-    if (categoryId) where.categoryId = categoryId;
+    const where: Record<string, unknown> = { deletedAt: null };
+    if (category) where.category = category;
 
-    const products = await prisma.product.findMany({
+    const materials = await prisma.rawMaterial.findMany({
       where,
-      include: { category: { select: { name: true } } },
       orderBy: { name: "asc" },
     });
 
-    const data = products.map((p) => {
+    const data = materials.map((p) => {
       const stock = p.stock;
       const minStock = p.minStock;
       let status: "in_stock" | "low" | "out";
@@ -283,11 +282,12 @@ export async function getStockReport(categoryId?: string) {
         id: p.id,
         name: p.name,
         sku: p.sku,
-        categoryName: p.category?.name ?? null,
+        categoryName: p.category ?? null,
         stock,
         minStock,
         buyPrice: Number(p.buyPrice),
-        sellPrice: Number(p.sellPrice),
+        sellPrice: 0,
+        unit: p.unit,
         status,
       };
     });

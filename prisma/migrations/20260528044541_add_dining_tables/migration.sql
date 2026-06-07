@@ -3,6 +3,7 @@ CREATE TABLE "dining_tables" (
     "id" TEXT NOT NULL,
     "business_info_id" TEXT NOT NULL,
     "table_number" INTEGER NOT NULL,
+    "label" TEXT NOT NULL DEFAULT '',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

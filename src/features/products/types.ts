@@ -8,11 +8,9 @@ export const productSchema = z.object({
   unit: z.string().min(1, "Satuan wajib diisi"),
   buyPrice: z.coerce.number().min(0, "Harga beli tidak boleh negatif"),
   sellPrice: z.coerce.number().min(1, "Harga jual wajib diisi"),
-  stock: z.coerce.number().int().min(0, "Stok tidak boleh negatif").default(0),
-  minStock: z.coerce.number().int().min(0, "Min stok tidak boleh negatif").default(5),
   description: z.string().optional(),
   imageUrl: z.string().optional().nullable(),
-  isActive: z.boolean().default(true),
+  isActive: z.coerce.boolean().default(true),
 }).refine((d) => d.sellPrice >= d.buyPrice, {
   message: "Harga jual harus lebih besar atau sama dengan harga beli",
   path: ["sellPrice"],
@@ -37,8 +35,6 @@ export type ProductWithCategory = {
   unit: string;
   buyPrice: number;
   sellPrice: number;
-  stock: number;
-  minStock: number;
   isActive: boolean;
   categoryId: string | null;
   category: { id: string; name: string } | null;

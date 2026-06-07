@@ -1,5 +1,5 @@
 type Props = {
-  items: { id: string; name: string; sku: string; stock: number; min_stock: number }[];
+  items: { id: string; name: string; sku: string; stock: number; minStock: number; unit?: string }[];
 };
 
 export function LowStockList({ items }: Props) {
@@ -31,7 +31,7 @@ export function LowStockList({ items }: Props) {
                   : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
               }`}
             >
-              {p.stock} / {p.min_stock}
+              {p.stock} / {p.minStock}
             </div>
           </div>
         );

@@ -45,7 +45,6 @@ export async function getPosProducts(params: {
       name: p.name,
       sku: p.sku,
       sellPrice: Number(p.sellPrice),
-      stock: p.stock,
       imageUrl: p.imageUrl,
       categoryName: p.category?.name ?? null,
       unit: p.unit,
@@ -60,70 +59,94 @@ export async function createPosOrder(data: {
   notes?: string;
   items: { productId: string; quantity: number; sellPrice: number }[];
 }) {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
-    return { success: false, error: { message: "Forbidden" } };
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+    if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
+      return { success: false, error: { message: "Forbidden" } };
 
-  const activeShift = await prisma.shift.findFirst({
-    where: { userId: session.user.id, status: "OPEN" },
-  });
-  if (!activeShift) return { success: false, error: { message: "Tidak ada shift aktif" } };
-
-  if (!data.items.length) return { success: false, error: { message: "Pilih minimal 1 item" } };
-  if (!data.customerName.trim()) return { success: false, error: { message: "Nama pemesan wajib diisi" } };
-
-  const productIds = [...new Set(data.items.map((i) => i.productId))];
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
-    select: { id: true, name: true },
-  });
-  const productMap = new Map(products.map((p) => [p.id, p.name]));
-
-  let total = 0;
-  const orderItemsData: {
-    productId: string;
-    productName: string;
-    quantity: number;
-    sellPrice: number;
-    subtotal: number;
-  }[] = [];
-
-  for (const item of data.items) {
-    const productName = productMap.get(item.productId);
-    if (!productName) return { success: false, error: { message: `Produk tidak ditemukan` } };
-    const subtotal = item.sellPrice * item.quantity;
-    total += subtotal;
-    orderItemsData.push({
-      productId: item.productId,
-      productName,
-      quantity: item.quantity,
-      sellPrice: item.sellPrice,
-      subtotal,
+    const activeShift = await prisma.shift.findFirst({
+      where: { userId: session.user.id, status: "OPEN" },
     });
+    if (!activeShift) return { success: false, error: { message: "Tidak ada shift aktif" } };
+
+    if (!data.items.length) return { success: false, error: { message: "Pilih minimal 1 item" } };
+    if (!data.customerName.trim()) return { success: false, error: { message: "Nama pemesan wajib diisi" } };
+
+    // Handle Random Table Assignment (-1)
+    let targetTable = data.tableNumber;
+    if (targetTable === -1) {
+      const biz = await prisma.businessInfo.findFirst();
+      const occupiedByOrder = await prisma.order.findMany({
+        where: { shiftId: activeShift.id, status: { notIn: ["CANCELLED"] }, paidAt: null },
+        select: { tableNumber: true },
+        distinct: ["tableNumber"],
+      });
+      const occupiedSet = new Set(occupiedByOrder.map((o) => o.tableNumber));
+      const availableTables = [];
+      for (let i = 1; i <= (biz?.totalTables ?? 10); i++) {
+        if (!occupiedSet.has(i)) availableTables.push(i);
+      }
+      targetTable = availableTables.length > 0 
+        ? availableTables[Math.floor(Math.random() * availableTables.length)]
+        : 1; // Fallback to table 1 if full
+    }
+
+    const productIds = [...new Set(data.items.map((i) => i.productId))];
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true },
+    });
+    const productMap = new Map(products.map((p) => [p.id, p.name]));
+
+    let total = 0;
+    const orderItemsData: {
+      productId: string;
+      productName: string;
+      quantity: number;
+      sellPrice: number;
+      subtotal: number;
+    }[] = [];
+
+    for (const item of data.items) {
+      const productName = productMap.get(item.productId);
+      if (!productName) return { success: false, error: { message: `Produk tidak ditemukan` } };
+      const subtotal = item.sellPrice * item.quantity;
+      total += subtotal;
+      orderItemsData.push({
+        productId: item.productId,
+        productName,
+        quantity: item.quantity,
+        sellPrice: item.sellPrice,
+        subtotal,
+      });
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        tableNumber: targetTable,
+        customerName: data.customerName,
+        notes: data.notes ?? null,
+        total,
+        shiftId: activeShift.id,
+        items: { create: orderItemsData },
+      },
+      select: { id: true },
+    });
+
+    await notifyRole(["OWNER"], {
+      type: "ORDER_CREATED",
+      title: "Pesanan Baru",
+      message: `Pesanan dari meja ${targetTable} (${data.customerName}) — Rp ${total.toLocaleString("id")}.`,
+      data: { orderId: order.id, tableNumber: targetTable, customerName: data.customerName, total },
+    });
+
+    revalidatePath("/pos");
+    return { success: true };
+  } catch (err) {
+    console.error("createPosOrder error:", err);
+    return { success: false, error: { message: "Gagal membuat pesanan (Server Error)" } };
   }
-
-  const order = await prisma.order.create({
-    data: {
-      tableNumber: data.tableNumber,
-      customerName: data.customerName,
-      notes: data.notes ?? null,
-      total,
-      shiftId: activeShift.id,
-      items: { create: orderItemsData },
-    },
-    select: { id: true },
-  });
-
-  await notifyRole(["OWNER"], {
-    type: "ORDER_CREATED",
-    title: "Pesanan Baru",
-    message: `Pesanan dari meja ${data.tableNumber} (${data.customerName}) — Rp ${total.toLocaleString("id")}.`,
-    data: { orderId: order.id, tableNumber: data.tableNumber, customerName: data.customerName, total },
-  });
-
-  revalidatePath("/pos");
-  return { success: true };
 }
 
 export async function getPosOrders() {
@@ -242,51 +265,28 @@ export async function getCompletedOrdersByTable(tableNumber: number) {
 }
 
 export async function updatePosOrderStatus(orderId: string, status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED") {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
-    return { success: false, error: { message: "Forbidden" } };
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+    if (!await hasPermissionAsync(session.user.role, "pos", "manage"))
+      return { success: false, error: { message: "Forbidden" } };
 
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
-  if (!order) return { success: false, error: { message: "Order tidak ditemukan" } };
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) return { success: false, error: { message: "Pesanan tidak ditemukan" } };
+    if (order.paidAt && status !== "CANCELLED") return { success: false, error: { message: "Pesanan sudah dibayar" } };
+    if (order.status === "CANCELLED") return { success: false, error: { message: "Pesanan sudah dibatalkan" } };
 
-  if (status === "CONFIRMED") {
-    if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah diproses" } };
-    await prisma.$transaction(async (tx) => {
-      await Promise.all(
-        order.items.map((item) =>
-          tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          })
-        )
-      );
-      await tx.order.update({ where: { id: orderId }, data: { status: "CONFIRMED" } });
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status },
     });
 
-    await notifyRole(["OWNER"], {
-      type: "ORDER_STATUS_CHANGED",
-      title: "Pesanan Dikonfirmasi",
-      message: `Pesanan meja ${order.tableNumber} (${order.customerName}) telah dikonfirmasi — Rp ${Number(order.total).toLocaleString("id")}.`,
-      data: { orderId, tableNumber: order.tableNumber, status },
-    });
-  } else if (status === "COMPLETED") {
-    if (order.status !== "CONFIRMED") return { success: false, error: { message: "Order belum dikonfirmasi" } };
-    await prisma.order.update({ where: { id: orderId }, data: { status: "COMPLETED" } });
-  } else if (status === "CANCELLED") {
-    if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah diproses, tidak bisa dibatalkan" } };
-    await prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
-
-    await notifyRole(["OWNER"], {
-      type: "ORDER_STATUS_CHANGED",
-      title: "Pesanan Dibatalkan",
-      message: `Pesanan meja ${order.tableNumber} (${order.customerName}) telah dibatalkan.`,
-      data: { orderId, tableNumber: order.tableNumber, status },
-    });
+    revalidatePath("/pos");
+    return { success: true };
+  } catch (err) {
+    console.error("updatePosOrderStatus error:", err);
+    return { success: false, error: { message: "Gagal memperbarui status" } };
   }
-
-  revalidatePath("/pos");
-  return { success: true };
 }
 
 export async function getTablesWithCompletedOrders() {
@@ -379,31 +379,6 @@ export async function checkout(data: {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    if (!data.orderIds?.length) {
-      const productIds = [...new Set(data.items.map((i) => i.productId))];
-      const products = await tx.product.findMany({
-        where: { id: { in: productIds } },
-        select: { id: true, name: true, stock: true },
-      });
-      const productMap = new Map(products.map((p) => [p.id, p]));
-
-      for (const item of data.items) {
-        const product = productMap.get(item.productId);
-        if (!product || product.stock < item.quantity) {
-          throw new Error(`Stok ${product?.name ?? "produk"} tidak mencukupi`);
-        }
-      }
-
-      await Promise.all(
-        data.items.map((item) =>
-          tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          })
-        )
-      );
-    }
-
     const txData = {
       invoiceNumber,
       shiftId: activeShift.id,

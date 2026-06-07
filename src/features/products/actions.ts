@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { productSchema, categorySchema } from "./types";
-import { createUploadUrl, getImageUrl } from "@/lib/cloudflare-images";
+
 import { hasPermissionAsync } from "@/lib/permissions-db";
 import { auth } from "@/lib/auth";
 import { createAuditLog } from "@/lib/audit-log";
@@ -85,6 +85,7 @@ export async function createProduct(formData: FormData) {
     data: {
       ...parsed.data,
       categoryId: parsed.data.categoryId || null,
+      imageUrl: parsed.data.imageUrl || null,
     },
   });
 
@@ -123,12 +124,12 @@ export async function updateProduct(id: string, formData: FormData) {
 
   const oldData = await prisma.product.findUnique({
     where: { id },
-    select: { name: true, sku: true, buyPrice: true, sellPrice: true, stock: true, minStock: true },
+    select: { name: true, sku: true, buyPrice: true, sellPrice: true },
   });
 
   await prisma.product.update({
     where: { id },
-    data: { ...parsed.data, categoryId: parsed.data.categoryId || null },
+    data: { ...parsed.data, categoryId: parsed.data.categoryId || null, imageUrl: parsed.data.imageUrl || null },
   });
 
   await createAuditLog({
@@ -139,15 +140,6 @@ export async function updateProduct(id: string, formData: FormData) {
     oldData: oldData as unknown as Record<string, unknown>,
     newData: parsed.data as unknown as Record<string, unknown>,
   });
-
-  if (parsed.data.stock <= parsed.data.minStock) {
-    await notifyRole(["OWNER", "WAREHOUSE"], {
-      type: "LOW_STOCK",
-      title: "Stok Menipis",
-      message: `${parsed.data.name} (${parsed.data.sku}): stok ${parsed.data.stock}/${parsed.data.minStock}.`,
-      data: { productId: id, stock: parsed.data.stock, minStock: parsed.data.minStock },
-    });
-  }
 
   revalidatePath("/products");
   return { success: true };
@@ -295,23 +287,4 @@ export async function deleteCategory(id: string) {
   return { success: true };
 }
 
-export async function getUploadUrlAction() {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false as const, error: { message: "Unauthorized" } };
-  if (!await hasPermissionAsync(session.user.role, "products", "manage"))
-    return { success: false as const, error: { message: "Forbidden" } };
 
-  const res = await createUploadUrl();
-  if (!res.success) return { success: false as const, error: { message: res.error.message } };
-
-  const imageUrl = getImageUrl(res.data.imageId);
-  if (!imageUrl) return { success: false as const, error: { message: "Cloudflare Images not configured" } };
-
-  return {
-    success: true as const,
-    data: {
-      uploadUrl: res.data.uploadUrl,
-      imageUrl,
-    },
-  };
-}

@@ -61,11 +61,9 @@ async function main() {
         categoryId: categories[p.category],
         sellPrice: p.sellPrice,
         buyPrice: p.buyPrice,
-        stock: p.stock,
         unit: p.unit,
         imageUrl: p.imageUrl,
         isActive: true,
-        minStock: 5,
       },
     });
     products.push({ id: created.id, name: created.name, sellPrice: Number(created.sellPrice) });
@@ -104,13 +102,77 @@ async function main() {
   }
   console.log(`✅ ${supplierData.length} suppliers`);
 
-  // ===== SHIFTS & TRANSACTIONS =====
+  // ===== USERS (for references) =====
   const cashier = await prisma.user.findUnique({ where: { email: "cashier@bertigapos.local" } });
   const superAdmin = await prisma.user.findUnique({ where: { email: "super_admin@bertigapos.local" } });
   if (!cashier || !superAdmin) {
-    console.log("❌ Seed users not found, run prisma seed first");
+    console.log("❌ Seed users not found, run `npx tsx prisma/seed.ts` first");
     return;
   }
+
+  // ===== RAW MATERIALS =====
+  const rawMaterialData = [
+    { name: "Biji Kopi Arabika", sku: "BKP-001", category: "Kopi", unit: "kg", stock: 10, minStock: 2, buyPrice: 120000 },
+    { name: "Susu Fresh", sku: "SUS-001", category: "Susu", unit: "liter", stock: 8, minStock: 3, buyPrice: 25000 },
+    { name: "Gula Pasir", sku: "GUL-001", category: "Sembako", unit: "kg", stock: 15, minStock: 5, buyPrice: 18000 },
+    { name: "Bubuk Matcha", sku: "BMC-001", category: "Kopi", unit: "kg", stock: 3, minStock: 1, buyPrice: 200000 },
+    { name: "Sirup Red Velvet", sku: "SRV-001", category: "Sirup", unit: "botol", stock: 5, minStock: 2, buyPrice: 45000 },
+    { name: "Tepung Terigu", sku: "TEP-001", category: "Sembako", unit: "kg", stock: 12, minStock: 4, buyPrice: 15000 },
+    { name: "Mentega", sku: "MEN-001", category: "Sembako", unit: "kg", stock: 4, minStock: 2, buyPrice: 35000 },
+    { name: "Ayam Fillet", sku: "AYM-001", category: "Protein", unit: "kg", stock: 6, minStock: 2, buyPrice: 45000 },
+    { name: "Jeruk Peras", sku: "JRP-001", category: "Buah", unit: "kg", stock: 7, minStock: 3, buyPrice: 30000 },
+    { name: "Lemon", sku: "LEM-001", category: "Buah", unit: "kg", stock: 0, minStock: 2, buyPrice: 40000 },
+  ];
+
+  const now = new Date();
+  for (const rm of rawMaterialData) {
+    const created = await prisma.rawMaterial.upsert({
+      where: { sku: rm.sku },
+      update: {},
+      create: {
+        name: rm.name,
+        sku: rm.sku,
+        category: rm.category,
+        unit: rm.unit,
+        stock: rm.stock,
+        minStock: rm.minStock,
+        buyPrice: rm.buyPrice,
+        isActive: true,
+      },
+    });
+
+    if (rm.stock > 0) {
+      const batchDate = new Date(now);
+      batchDate.setDate(batchDate.getDate() - Math.floor(Math.random() * 14));
+      const batch = await prisma.rawMaterialBatch.create({
+        data: {
+          rawMaterialId: created.id,
+          batchCode: `BATCH-${rm.sku}-001`,
+          quantity: rm.stock,
+          buyPrice: rm.buyPrice,
+          receivedDate: batchDate,
+          supplierId: "PT Kopi Nusantara",
+          notes: "Stok awal",
+        },
+      });
+
+      await prisma.rawMaterialMovement.create({
+        data: {
+          rawMaterialId: created.id,
+          userId: superAdmin!.id,
+          type: "STOCK_IN",
+          quantity: rm.stock,
+          stockBefore: 0,
+          stockAfter: rm.stock,
+          batchId: batch.id,
+          notes: "Stok awal (seed)",
+        },
+      });
+    }
+  }
+  console.log(`✅ ${rawMaterialData.length} raw materials`);
+
+  // ===== SHIFTS & TRANSACTIONS =====
 
   // Yesterday's closed shift (simulate a full day)
   const yesterday = new Date();

@@ -19,7 +19,7 @@ export default function DashboardPage() {
     totalSales: number;
     avgTransaction: number;
     totalProducts: number;
-    lowStockList: { id: string; name: string; sku: string; stock: number; min_stock: number }[];
+    lowStockList: { id: string; name: string; sku: string; stock: number; minStock: number; unit: string }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +81,7 @@ export default function DashboardPage() {
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Stok Hampir Habis
+            Stok Bahan Baku Hampir Habis
           </h3>
           <LowStockList items={stats?.lowStockList ?? []} />
         </div>

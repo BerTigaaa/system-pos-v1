@@ -91,38 +91,44 @@ export async function getShiftList(params: {
 }
 
 export async function openShift(formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
-  if (!await hasPermissionAsync(session.user.role, "shifts", "manage"))
-    return { success: false, error: { message: "Forbidden" } };
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+    if (!await hasPermissionAsync(session.user.role, "shifts", "manage"))
+      return { success: false, error: { message: "Forbidden" } };
 
-  const active = await prisma.shift.findFirst({
-    where: { userId: session.user.id, status: "OPEN" },
-  });
-  if (active) return { success: false, error: { message: "Anda masih memiliki shift aktif" } };
+    const active = await prisma.shift.findFirst({
+      where: { userId: session.user.id, status: "OPEN" },
+    });
+    if (active) return { success: false, error: { message: "Anda masih memiliki shift aktif" } };
 
-  const parsed = openShiftSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
+    const parsed = openShiftSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { success: false, error: { message: parsed.error.issues[0].message } };
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+    if (!user) return { success: false, error: { message: "Sesi tidak valid. Silakan logout dan login ulang." } };
 
-  await prisma.shift.create({
-    data: {
-      userId: session.user.id,
-      openingBalance: parsed.data.openingBalance,
-      notes: parsed.data.notes,
-    },
-  });
+    await prisma.shift.create({
+      data: {
+        userId: session.user.id,
+        openingBalance: parsed.data.openingBalance,
+        notes: parsed.data.notes,
+      },
+    });
 
-  await notifyRole(["OWNER", "FINANCE"], {
-    type: "SETTINGS_CHANGED",
-    title: "Shift Dibuka",
-    message: `${user?.name ?? session.user.id} membuka shift dengan saldo Rp ${Number(parsed.data.openingBalance).toLocaleString("id")}.`,
-    data: { userId: session.user.id, openingBalance: Number(parsed.data.openingBalance) },
-  });
+    await notifyRole(["OWNER", "FINANCE"], {
+      type: "SETTINGS_CHANGED",
+      title: "Shift Dibuka",
+      message: `${user.name} membuka shift dengan saldo Rp ${Number(parsed.data.openingBalance).toLocaleString("id")}.`,
+      data: { userId: session.user.id, openingBalance: Number(parsed.data.openingBalance) },
+    });
 
-  revalidatePath("/shifts");
-  return { success: true };
+    revalidatePath("/shifts");
+    return { success: true };
+  } catch (err) {
+    console.error("openShift error:", err);
+    return { success: false, error: { message: "Gagal membuka shift" } };
+  }
 }
 
 export async function closeShift(shiftId: string, formData: FormData) {

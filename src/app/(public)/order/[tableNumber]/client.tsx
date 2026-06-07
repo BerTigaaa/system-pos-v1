@@ -10,7 +10,7 @@ import {
 import { createOrder, getOrderProducts, getTableOrders, updateOrderItems } from "@/features/orders/actions";
 
 type PosProduct = {
-  id: string; name: string; sku: string; sellPrice: number; stock: number; unit: string; imageUrl: string | null;
+  id: string; name: string; sku: string; sellPrice: number; unit: string; imageUrl: string | null;
 };
 
 type CartItem = { productId: string; name: string; sellPrice: number; quantity: number };
@@ -356,11 +356,10 @@ export function OrderPageClient({ tableNumber, tableLabel, businessName }: { tab
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {products.map((p) => (
-              <button
+                <button
                 key={p.id}
                 onClick={() => addToCart(p)}
-                disabled={p.stock <= 0}
-                className="text-left rounded-2xl border border-gray-100 bg-white overflow-hidden hover:border-blue-200 hover:shadow-md active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-left rounded-2xl border border-gray-100 bg-white overflow-hidden hover:border-blue-200 hover:shadow-md active:scale-[0.97] transition-all"
               >
                 <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
                   {p.imageUrl ? (

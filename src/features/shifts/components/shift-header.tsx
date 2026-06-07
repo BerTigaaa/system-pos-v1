@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Button, Statistic, Modal, Form, InputNumber, Input } from "antd";
+import { Card, Button, Statistic, Modal, InputNumber, Input } from "antd";
 import { useToast } from "@/components/ui/toast";
 import { PlayCircleOutlined, StopOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -16,8 +16,10 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
   const [openModal, setOpenModal] = useState(false);
   const [closeModal, setCloseModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [openForm] = Form.useForm();
-  const [closeForm] = Form.useForm();
+  const [openBalance, setOpenBalance] = useState<number>(0);
+  const [openNotes, setOpenNotes] = useState("");
+  const [closeBalance, setCloseBalance] = useState<number>(0);
+  const [closeNotes, setCloseNotes] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -28,39 +30,59 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
 
   useEffect(() => { load(); }, []);
 
-  const handleOpen = async (values: { openingBalance: number; notes?: string }) => {
+  const handleOpen = async () => {
+    if (openBalance < 0) {
+      toast.error("Saldo awal tidak boleh negatif");
+      return;
+    }
     setSubmitting(true);
     const fd = new FormData();
-    fd.set("openingBalance", String(values.openingBalance));
-    if (values.notes) fd.set("notes", values.notes);
-    const res = await openShift(fd);
-    if (res.success) {
-      toast.success("Shift dibuka");
-      setOpenModal(false);
-      openForm.resetFields();
-      await load();
-      onChanged();
-    } else {
-      toast.error(res.error?.message ?? "Gagal");
+    fd.set("openingBalance", String(openBalance));
+    if (openNotes) fd.set("notes", openNotes);
+    try {
+      const res = await openShift(fd);
+      if (res.success) {
+        toast.success("Shift dibuka");
+        setOpenModal(false);
+        setOpenBalance(0);
+        setOpenNotes("");
+        await load();
+        onChanged();
+      } else {
+        toast.error(res.error?.message ?? "Gagal");
+      }
+    } catch (err) {
+      toast.error("Gagal membuka shift");
+      console.error(err);
     }
     setSubmitting(false);
   };
 
-  const handleClose = async (values: { closingBalance: number; notes?: string }) => {
+  const handleClose = async () => {
     if (!active) return;
+    if (closeBalance < 0) {
+      toast.error("Saldo akhir tidak boleh negatif");
+      return;
+    }
     setSubmitting(true);
     const fd = new FormData();
-    fd.set("closingBalance", String(values.closingBalance));
-    if (values.notes) fd.set("notes", values.notes);
-    const res = await closeShift(active.id, fd);
-    if (res.success) {
-      toast.success("Shift ditutup");
-      setCloseModal(false);
-      closeForm.resetFields();
-      await load();
-      onChanged();
-    } else {
-      toast.error(res?.error?.message ?? "Gagal");
+    fd.set("closingBalance", String(closeBalance));
+    if (closeNotes) fd.set("notes", closeNotes);
+    try {
+      const res = await closeShift(active.id, fd);
+      if (res.success) {
+        toast.success("Shift ditutup");
+        setCloseModal(false);
+        setCloseBalance(0);
+        setCloseNotes("");
+        await load();
+        onChanged();
+      } else {
+        toast.error(res?.error?.message ?? "Gagal");
+      }
+    } catch (err) {
+      toast.error("Gagal menutup shift");
+      console.error(err);
     }
     setSubmitting(false);
   };
@@ -125,69 +147,67 @@ export function ShiftHeader({ onChanged }: { onChanged: () => void }) {
       <Modal
         title="Buka Shift"
         open={openModal}
-        onCancel={() => setOpenModal(false)}
+        onCancel={() => { setOpenModal(false); setOpenBalance(0); setOpenNotes(""); }}
         footer={null}
         width={500}
         destroyOnHidden
       >
-        <Form form={openForm} layout="vertical" onFinish={handleOpen}>
-          <Form.Item
-            name="openingBalance"
-            label="Saldo Awal"
-            rules={[{ required: true, message: "Masukkan saldo awal" }]}
-          >
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Saldo Awal</label>
             <InputNumber
               className="!w-full"
               min={0}
               prefix="Rp"
               placeholder="0"
+              value={openBalance}
+              onChange={(v) => setOpenBalance(v ?? 0)}
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
-                parser={(v) => Number(v?.replace(/\./g, "") ?? 0) as unknown as 0}
+              parser={(v) => Number(v?.replace(/\./g, "") ?? 0) as unknown as 0}
             />
-          </Form.Item>
-          <Form.Item name="notes" label="Catatan">
-            <Input.TextArea rows={3} placeholder="Catatan (opsional)" />
-          </Form.Item>
-          <Form.Item className="mb-0 text-right">
-            <Button onClick={() => setOpenModal(false)} className="mr-2">Batal</Button>
-            <Button type="primary" htmlType="submit" loading={submitting}>Buka Shift</Button>
-          </Form.Item>
-        </Form>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Catatan</label>
+            <Input.TextArea rows={3} placeholder="Catatan (opsional)" value={openNotes} onChange={(e) => setOpenNotes(e.target.value)} />
+          </div>
+          <div className="text-right">
+            <Button onClick={() => { setOpenModal(false); setOpenBalance(0); setOpenNotes(""); }} className="mr-2">Batal</Button>
+            <Button type="primary" loading={submitting} onClick={handleOpen}>Buka Shift</Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal
         title="Tutup Shift"
         open={closeModal}
-        onCancel={() => setCloseModal(false)}
+        onCancel={() => { setCloseModal(false); setCloseBalance(0); setCloseNotes(""); }}
         footer={null}
         width={500}
         destroyOnHidden
       >
-        <Form form={closeForm} layout="vertical" onFinish={handleClose}>
-          <Form.Item
-            name="closingBalance"
-            label="Saldo Akhir"
-            rules={[{ required: true, message: "Masukkan saldo akhir" }]}
-          >
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Saldo Akhir</label>
             <InputNumber
               className="!w-full"
               min={0}
               prefix="Rp"
               placeholder="0"
+              value={closeBalance}
+              onChange={(v) => setCloseBalance(v ?? 0)}
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
-                parser={(v) => Number(v?.replace(/\./g, "") ?? 0) as unknown as 0}
+              parser={(v) => Number(v?.replace(/\./g, "") ?? 0) as unknown as 0}
             />
-          </Form.Item>
-          <Form.Item name="notes" label="Catatan">
-            <Input.TextArea rows={3} placeholder="Catatan (opsional)" />
-          </Form.Item>
-          <Form.Item className="mb-0 text-right">
-            <Button onClick={() => setCloseModal(false)} className="mr-2">Batal</Button>
-            <Button type="primary" htmlType="submit" loading={submitting} danger>
-              Tutup Shift
-            </Button>
-          </Form.Item>
-        </Form>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Catatan</label>
+            <Input.TextArea rows={3} placeholder="Catatan (opsional)" value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} />
+          </div>
+          <div className="text-right">
+            <Button onClick={() => { setCloseModal(false); setCloseBalance(0); setCloseNotes(""); }} className="mr-2">Batal</Button>
+            <Button type="primary" loading={submitting} danger onClick={handleClose}>Tutup Shift</Button>
+          </div>
+        </div>
       </Modal>
     </>
   );

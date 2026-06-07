@@ -164,6 +164,13 @@ export async function getSystemInfo() {
   };
 }
 
+export async function getMyRoleOverrides() {
+  const session = await auth();
+  if (!session?.user?.role) return { success: false as const, error: { message: "Unauthorized" }, data: [] };
+  const overrides = await getPermissionOverrides(session.user.role);
+  return { success: true as const, data: overrides };
+}
+
 export async function getRolePermissions(role: string) {
   const session = await auth();
   if (!session?.user?.id || !await hasPermissionAsync(session.user.role, "admin", "manage"))

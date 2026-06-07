@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { Form, Input, InputNumber, Select, Switch, Button, Image, Upload, message } from "antd";
+import { useEffect, useState } from "react";
+import { Form, Input, InputNumber, Select, Switch, Button, Image, Upload } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import { createProduct, updateProduct, getCategories, getUploadUrlAction } from "../actions";
+import { createProduct, updateProduct, getCategories } from "../actions";
+import { useToast } from "@/components/ui/toast";
 
 type Props = {
   initial?: {
@@ -15,8 +16,6 @@ type Props = {
     unit: string;
     buyPrice: number;
     sellPrice: number;
-    stock: number;
-    minStock: number;
     description: string | null;
     imageUrl: string | null;
     isActive: boolean;
@@ -30,6 +29,7 @@ export function ProductForm({ initial, onSuccess, onCancel }: Props) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [imagePreview, setImagePreview] = useState(initial?.imageUrl ?? null);
+  const toast = useToast();
 
   useEffect(() => {
     getCategories().then((res) => {
@@ -42,8 +42,6 @@ export function ProductForm({ initial, onSuccess, onCancel }: Props) {
     else {
       form.resetFields();
       form.setFieldValue("unit", "pcs");
-      form.setFieldValue("minStock", 5);
-      form.setFieldValue("stock", 0);
       form.setFieldValue("buyPrice", 0);
       form.setFieldValue("isActive", true);
     }
@@ -94,14 +92,6 @@ export function ProductForm({ initial, onSuccess, onCancel }: Props) {
       <Form.Item name="sellPrice" label="Harga Jual" rules={[{ required: true, message: "Wajib diisi" }]}>
         <InputNumber className="!w-full" min={0} prefix="Rp" />
       </Form.Item>
-      <div className="flex gap-3">
-        <Form.Item name="stock" label="Stok Awal" className="flex-1">
-          <InputNumber className="!w-full" min={0} />
-        </Form.Item>
-        <Form.Item name="minStock" label="Min. Stok" className="flex-1">
-          <InputNumber className="!w-full" min={0} />
-        </Form.Item>
-      </div>
       <Form.Item name="description" label="Deskripsi">
         <Input.TextArea rows={2} placeholder="Opsional" />
       </Form.Item>
@@ -116,28 +106,19 @@ export function ProductForm({ initial, onSuccess, onCancel }: Props) {
             accept="image/*"
             showUploadList={false}
             customRequest={async ({ file, onSuccess, onError }) => {
-              const res = await getUploadUrlAction();
-              if (!res.success || !res.data) {
-                onError?.(new Error(res.error?.message ?? "Gagal"));
-                return;
-              }
-              const formData = new FormData();
-              formData.append("file", file as Blob);
               try {
-                const uploadRes = await fetch(res.data.uploadUrl, {
-                  method: "POST",
-                  body: formData,
-                });
-                const uploadJson = await uploadRes.json();
-                if (uploadJson.success) {
-                  const imageUrl = res.data.imageUrl;
-                  form.setFieldsValue({ imageUrl });
-                  setImagePreview(imageUrl);
-                  onSuccess?.(uploadJson);
-                  message.success("Gambar diupload");
-                } else {
-                  onError?.(new Error(uploadJson.errors?.[0]?.message ?? "Upload gagal"));
+                const fd = new FormData();
+                fd.append("file", file as Blob);
+                const res = await fetch("/api/upload", { method: "POST", body: fd });
+                const data = await res.json();
+                if (!res.ok) {
+                  onError?.(new Error(data.error ?? "Upload gagal"));
+                  return;
                 }
+                form.setFieldsValue({ imageUrl: data.url });
+                setImagePreview(data.url);
+                onSuccess?.(data);
+                toast.success("Gambar diupload");
               } catch {
                 onError?.(new Error("Upload gagal"));
               }

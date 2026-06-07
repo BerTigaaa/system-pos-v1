@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import { Tabs } from "antd";
-import { MovementList } from "@/features/inventory/components/movement-list";
-import { AdjustmentForm } from "@/features/inventory/components/adjustment-form";
 import { SupplierTable } from "@/features/suppliers/components/supplier-table";
+import { RawMaterialTable } from "@/features/raw-materials/components/raw-material-table";
+import { StockInForm } from "@/features/raw-materials/components/stock-in-form";
+import { StockOutForm } from "@/features/raw-materials/components/stock-out-form";
+import { ExpiryWarning } from "@/features/raw-materials/components/expiry-warning";
+import { RawMaterialMovementList } from "@/features/raw-materials/components/raw-material-movement-list";
 
 export function InventoryClient() {
-  const [tab, setTab] = useState("movements");
+  const [tab, setTab] = useState("raw-materials");
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gudang</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">Manajemen stok & supplier</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Manajemen bahan baku, stok & supplier</p>
       </div>
 
       <Tabs
@@ -21,14 +24,29 @@ export function InventoryClient() {
         onChange={setTab}
         items={[
           {
-            key: "movements",
-            label: "Riwayat Stok",
-            children: <MovementList />,
+            key: "raw-materials",
+            label: "Bahan Baku",
+            children: <RawMaterialTable />,
           },
           {
-            key: "adjustment",
-            label: "Penyesuaian Stok",
-            children: <AdjustmentForm />,
+            key: "stock-in",
+            label: "Stok Masuk",
+            children: <StockInForm />,
+          },
+          {
+            key: "stock-out",
+            label: "Stok Keluar",
+            children: <StockOutForm />,
+          },
+          {
+            key: "rm-movements",
+            label: "Riwayat Bahan Baku",
+            children: <RawMaterialMovementList />,
+          },
+          {
+            key: "expiry",
+            label: "Kadaluwarsa",
+            children: <ExpiryWarning />,
           },
           {
             key: "suppliers",
