@@ -15,7 +15,7 @@
   - [POS (Point of Sale)](#2-pos)
   - [Shift](#3-shift)
   - [Produk](#4-produk)
-  - [Gudang](#5-gudang)
+  - [Gudang & Bahan Baku](#5-gudang--bahan-baku)
   - [Supplier](#6-supplier)
   - [Transaksi](#7-transaksi)
   - [Keuangan](#8-keuangan)
@@ -25,6 +25,8 @@
   - [Audit Log](#12-audit-log)
   - [Notifikasi](#13-notifikasi)
   - [Pengaturan](#14-pengaturan)
+- [Arsitektur Stok](#arsitektur-stok)
+- [Upload Foto Produk](#upload-foto-produk)
 - [Notifikasi](#notifikasi)
 - [Permission Matrix](#permission-matrix)
 
@@ -68,9 +70,10 @@ Buka **http://localhost:3000** — login menggunakan akun seed:
 
 ## Tech Stack
 
-- **Frontend:** Next.js 15 (App Router), TypeScript 5, TailwindCSS 3, Ant Design 5, Zustand 4, Recharts
+- **Frontend:** Next.js 16 (App Router, Turbopack), TypeScript 5, TailwindCSS 3, Ant Design 5, Zustand 4, Recharts
 - **Backend:** Next.js Server Actions, Prisma ORM 5, PostgreSQL 16
-- **Auth:** NextAuth v5 (Auth.js), bcryptjs, RBAC middleware
+- **Auth:** NextAuth v5 (Auth.js), bcryptjs, RBAC (hardcoded + DB override)
+- **Upload:** Local file storage (`public/products/`)
 - **Deploy:** Vercel / Railway / VPS
 
 ---
@@ -84,7 +87,7 @@ Ada **5 role** dengan akses berbeda:
 | **SUPER_ADMIN** | Developer/system admin — full akses ke semua fitur |
 | **OWNER** | Pemilik bisnis — full akses data bisnis, kecuali admin sistem |
 | **CASHIER** | Kasir — POS, transaksi, shift, dashboard |
-| **WAREHOUSE** | Gudang — produk, stok, supplier, inventori |
+| **WAREHOUSE** | Gudang — bahan baku, produk (view), supplier |
 | **FINANCE** | Keuangan — laporan, kas masuk/keluar, rekap |
 
 ---
@@ -99,7 +102,7 @@ Ada **5 role** dengan akses berbeda:
 - Greeting + user info
 - 4 kartu statistik: Penjualan Hari Ini, Jumlah Transaksi, Rata-rata Transaksi, Total Produk
 - Grafik penjualan 7 hari (area chart)
-- Daftar stok menipis (stock ≤ min_stock)
+- Daftar bahan baku stok menipis (stok ≤ min_stock)
 - 10 transaksi terbaru
 
 **Aksi:**
@@ -117,7 +120,7 @@ Ada **5 role** dengan akses berbeda:
 - Nama pelanggan, pilih meja, daftar item di cart
 
 **Aksi:**
-- Klik produk → tambah ke cart
+- Klik produk → tambah ke cart (tanpa validasi stok — produk display-only)
 - +/- quantity, hapus item
 - Pilih meja (kursi tersedia saja)
 - **"Pesan"** → buat order status PENDING
@@ -159,9 +162,9 @@ Ada **5 role** dengan akses berbeda:
 
 **Aksi:**
 - **"Buka Shift"** — modal input saldo awal + catatan
-- **"Tutup Shift"** — modal input saldo akhir + catatan
+- **"Tutup Shift"** — modal input saldo akhir + catatan (rekap otomatis dari transaksi POS)
 
-> Shift harus dibuka sebelum bertransaksi di POS.
+> Shift harus dibuka sebelum bertransaksi di POS. Data keuangan (kas masuk/keluar) TIDAK terikat shift.
 
 ---
 
@@ -170,28 +173,65 @@ Ada **5 role** dengan akses berbeda:
 **Akses:** SUPER_ADMIN, OWNER, **WAREHOUSE**
 
 **Tampilan:**
-- Tabel produk: gambar, nama+SKU, kategori, harga jual, stok, status (aktif/nonaktif)
+- Tabel produk: gambar, nama+SKU, kategori, harga jual, status (aktif/nonaktif)
+- **Catatan:** Produk bersifat **display-only** — tidak ada kolom stok
 
 **Aksi:**
-- **"Tambah Produk"** — form: nama, SKU (auto/manual), barcode, kategori, satuan (pcs/kg/liter/box), harga beli, harga jual, stok, min_stok, deskripsi, gambar
+- **"Tambah Produk"** — form: nama, SKU (auto/manual), barcode, kategori, satuan (pcs/kg/liter/box), harga beli, harga jual, deskripsi, gambar (upload atau URL)
 - **Edit** — form sama terisi
 - **Hapus** — soft delete (konfirmasi)
 - **Toggle aktif/nonaktif** — inline switch
 - **"Kelola Kategori"** — tambah/edit/hapus kategori
 
+> Stok produk tidak dikelola di sini. Manajemen stok dilakukan di modul **Bahan Baku**.
+
 ---
 
-### 5. Gudang
+### 5. Gudang & Bahan Baku
 
 **Akses:** SUPER_ADMIN, OWNER, **WAREHOUSE**
 
-#### Tab: Riwayat Stok
-**Tampilan:** Riwayat pergerakan stok (waktu, produk, tipe, qty ±, stok sebelum/sesudah, alasan, user)
-**Filter:** Search nama, filter tipe (PURCHASE / SALE / MANUAL_OUT / ADJUSTMENT / OPNAME / RETURN)
+Halaman Gudang memiliki **6 tab**:
 
-#### Tab: Penyesuaian Stok
+#### Tab 1: Bahan Baku
+**Tampilan:** Tabel bahan baku: nama, SKU, kategori, satuan, stok saat ini, stok minimum, harga beli, status
+
 **Aksi:**
-- Pilih produk, pilih tipe (Pembelian/Manual Keluar/Penyesuaian/Retur), input qty + alasan → Simpan
+- **"Tambah Bahan Baku"** — form: nama, SKU, kategori, satuan, harga beli, stok minimum, deskripsi
+- **Edit** — inline edit
+- **Hapus** — soft delete
+
+#### Tab 2: Stok Masuk
+**Tampilan:** Form stok masuk + riwayat stok masuk
+
+**Aksi:**
+- Pilih bahan baku
+- Pilih supplier
+- Input: kode batch, jumlah, harga beli per batch, tanggal terima, tanggal kadaluwarsa (opsional)
+- Batch otomatis menambah stok bahan baku
+
+#### Tab 3: Stok Keluar
+**Tampilan:** Form stok keluar + riwayat stok keluar
+
+**Aksi:**
+- Pilih bahan baku
+- Input: jumlah, alasan (produksi, rusak, sample, dll)
+- Sistem otomatis pilih batch tertua (**FIFO** — First In First Out)
+
+#### Tab 4: Riwayat Bahan Baku
+**Tampilan:** Riwayat semua pergerakan stok bahan baku
+
+**Filter:** Search nama, filter tipe (STOCK_IN / STOCK_OUT / ADJUSTMENT / OPNAME)
+
+#### Tab 5: Kadaluwarsa
+**Tampilan:** Daftar batch yang akan expired dalam 14 hari ke depan
+
+**Highlight:** Batch yang sudah expired ditampilkan di atas
+
+#### Tab 6: Supplier
+**Tampilan:** Tabel supplier: nama, telepon, email, alamat
+
+**Aksi:** Tambah, Edit, Hapus
 
 ---
 
@@ -216,7 +256,7 @@ Ada **5 role** dengan akses berbeda:
 
 **Aksi:**
 - Lihat detail (drawer): items, ringkasan keuangan, histori refund
-- **"Refund"** (khusus SUPER_ADMIN / OWNER) — pilih item, qty, alasan → refund otomatis balikkan stok
+- **"Refund"** (khusus SUPER_ADMIN / OWNER) — pilih item, qty, alasan → refund tercatat (stok produk tidak dikembalikan — display-only)
 - **"Cetak Struk"**
 - Export Excel & PDF
 
@@ -230,13 +270,19 @@ Ada **5 role** dengan akses berbeda:
 **Tampilan:** Tabel pemasukan: tanggal, kategori, deskripsi, jumlah (hijau)
 **Aksi:** Tambah, Edit, Hapus — filter kategori & tanggal
 
+**Kategori Kas Masuk:** Penjualan, Modal, Pinjaman, Lain-lain
+
 #### Tab: Kas Keluar
 **Tampilan:** Tabel pengeluaran: jumlah (merah)
 **Aksi:** Tambah, Edit, Hapus — filter kategori & tanggal
 
+**Kategori Kas Keluar:** Pembelian Stok, Gaji, Sewa, Utilitas, Operasional, Lain-lain
+
 #### Tab: Rekap (P&L)
 **Tampilan:** Kartu statistik: Penjualan, Kas Masuk, Total Pendapatan, HPP, Laba Kotor, Kas Keluar, Laba Bersih
 **Filter:** Bulan & Tahun
+
+> **Catatan:** Keuangan (Kas Masuk/Kas Keluar) adalah catatan manual untuk aktivitas non-penjualan (sewa, gaji, modal, dll). TIDAK terikat dengan shift.
 
 ---
 
@@ -250,7 +296,7 @@ Ada **5 role** dengan akses berbeda:
 | Penjualan Bulanan | Rekap bulanan — filter bulan & tahun |
 | Penjualan Tahunan | Rekap tahunan — filter tahun |
 | Produk Terlaris | Top produk — filter periode & kategori |
-| Stok Barang | Laporan stok — filter kategori & status |
+| Stok Bahan Baku | Laporan stok bahan baku — filter kategori & status |
 | Aktivitas Kasir | Aktivitas per kasir — filter kasir, periode, shift |
 
 **Aksi:** Export Excel (.xlsx) & PDF (.pdf) di setiap tab.
@@ -308,7 +354,7 @@ Ada **5 role** dengan akses berbeda:
 - Klik centang → tandai satu notifikasi dibaca
 
 **Notifikasi yang terkirim secara otomatis:**
-- Stok menipis / habis → Owner, Warehouse
+- Stok bahan baku menipis / habis → Owner, Warehouse
 - Pesanan baru / status berubah → Cashier, Owner
 - Refund diproses → Owner, Finance
 - Perubahan data penting → Owner
@@ -330,16 +376,111 @@ Ada **5 role** dengan akses berbeda:
 
 ---
 
+## Arsitektur Stok
+
+### Produk = Display-Only
+
+Produk di BertigaPos bersifat **display-only** — digunakan untuk:
+- Menampilkan menu di POS
+- Menampilkan gambar, nama, harga
+- **Tidak** untuk manajemen stok
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  PRODUK (display-only)                                  │
+│  • Nama, SKU, Harga, Gambar, Kategori                   │
+│  • Tidak ada kolom stok                                 │
+│  • Tidak ada validasi stok saat checkout                │
+│  • Tidak ada decrement stok saat transaksi              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Bahan Baku = Manajemen Stok
+
+Stok dikelola melalui **Bahan Baku (Raw Materials)** dengan sistem batch:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  BAHAN BAKU (stok sesungguhnya)                         │
+│  • Nama, SKU, Kategori, Satuan, Harga Beli              │
+│  • Stok saat ini (dihitung dari semua batch)            │
+│  • Stok minimum (untuk peringatan)                      │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  BATCH (RawMaterialBatch)                               │
+│  • Batch Code, Quantity, Harga Beli                     │
+│  • Tanggal Terima, Tanggal Kadaluwarsa                  │
+│  • Supplier                                             │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  PERGERAKAN (RawMaterialMovement)                       │
+│  • Tipe: STOCK_IN / STOCK_OUT / ADJUSTMENT / OPNAME     │
+│  • Quantity, Stok Sebelum/Sesudah                       │
+│  • Batch (untuk STOCK_IN/STOCK_OUT)                     │
+│  • Alasan, Catatan                                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Alur Stok Keluar (FIFO)
+
+Saat stok keluar, sistem menggunakan metode **FIFO** (First In First Out):
+
+```
+1. User input: Bahan Baku "Kopi", Quantity: 10
+2. Sistem cari batch tertua:
+   - Batch A (expired: 2026-07-01): qty 5  → ambil 5
+   - Batch B (expired: 2026-08-15): qty 8  → ambil 5
+   - Batch C (expired: 2026-09-30): qty 12 → sisa tidak diambil
+3. Hasil:
+   - Batch A: qty 0 (habis)
+   - Batch B: qty 3
+   - Batch C: qty 12
+   - Movement: STOCK_OUT, qty 10, stock_before 25, stock_after 15
+```
+
+### Peringatan Kadaluwarsa
+
+Sistem menampilkan peringatan untuk batch yang akan expired:
+- **≤ 14 hari**: Ditampilkan di tab Kadaluwarsa
+- **Sudah expired**: Highlight merah di atas daftar
+
+---
+
+## Upload Foto Produk
+
+Produk mendukung **dua cara** untuk menambahkan gambar:
+
+### 1. Upload File
+- Klik tombol **Upload** di form produk
+- Pilih file gambar (JPG, PNG, WebP, GIF, max 5MB)
+- File disimpan di `public/products/` dengan nama UUID
+- URL: `/products/{uuid}.{ext}`
+
+### 2. URL Eksternal
+- Paste link gambar di input **Gambar**
+- Contoh: `https://example.com/product.jpg`
+
+### Konfigurasi
+- File upload disimpan di folder `public/products/`
+- Folder ini di-`.gitignore` (foto tidak di-commit ke git)
+- Untuk production, pertimbangkan migrasi ke Cloudflare R2 atau S3
+
+---
+
 ## Notifikasi
 
 Notifikasi dikirim otomatis dari **23 titik** di seluruh modul:
 
 | Tipe Notifikasi | Dikirim ke | Saat |
 |----------------|-----------|------|
-| `LOW_STOCK` | Owner, Warehouse | Stok ≤ min_stok |
-| `OUT_OF_STOCK` | Owner, Warehouse | Stok = 0 |
+| `LOW_STOCK` | Owner, Warehouse | Stok bahan baku ≤ min_stok |
+| `OUT_OF_STOCK` | Owner, Warehouse | Stok bahan baku = 0 |
 | `REFUND_SUCCESS` | Owner, Finance | Refund berhasil |
-| `STOCK_ADJUSTED` | Owner | Stok disesuaikan |
+| `STOCK_ADJUSTED` | Owner | Stok bahan baku disesuaikan |
 | `ORDER_CREATED` | Cashier, Owner | Pesanan baru masuk |
 | `ORDER_STATUS_CHANGED` | Cashier, Owner | Status pesanan berubah |
 | `CASH_FLOW_CREATED` | Owner, Finance | Kas masuk/keluar baru |
@@ -347,7 +488,10 @@ Notifikasi dikirim otomatis dari **23 titik** di seluruh modul:
 | `EMPLOYEE_PASSWORD_RESET` | Owner | Password karyawan direset |
 | `USER_ROLE_CHANGED` | Owner | Role user diubah |
 | `SUPPLIER_CREATED` | Owner, Warehouse | Supplier baru |
-| dan 12 tipe lainnya | — | — |
+| `PRODUCT_ADDED` | Owner, Warehouse | Produk baru ditambahkan |
+| `PRODUCT_DELETED` | Owner, Warehouse | Produk dihapus |
+| `PRODUCT_STATUS_CHANGED` | Owner, Warehouse | Produk diaktifkan/dinonaktifkan |
+| dan tipe lainnya | — | — |
 
 ---
 
@@ -358,9 +502,9 @@ Notifikasi dikirim otomatis dari **23 titik** di seluruh modul:
 | Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ |
 | POS | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Shift | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Produk | ✅ | ✅ | ❌ | ✅ (kecuali hapus) | ❌ |
-| Gudang | ✅ | ✅ | ❌ | ✅ (kecuali hapus) | ❌ |
-| Supplier | ✅ | ✅ | ❌ | ✅ (kecuali hapus) | ❌ |
+| Produk | ✅ | ✅ | ❌ | ✅ (view + manage) | ❌ |
+| Gudang (Bahan Baku) | ✅ | ✅ | ❌ | ✅ (view + manage) | ❌ |
+| Supplier | ✅ | ✅ | ❌ | ✅ (view + manage) | ❌ |
 | Transaksi | ✅ | ✅ | ✅ (view + create) | ❌ | ✅ (view) |
 | Refund | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Keuangan | ✅ | ✅ | ❌ | ❌ | ✅ (view + create) |
@@ -373,6 +517,40 @@ Notifikasi dikirim otomatis dari **23 titik** di seluruh modul:
 
 ---
 
+## Struktur Database
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ENTITAS UTAMA                                          │
+├─────────────────────────────────────────────────────────┤
+│  User, Role, RolePermission, PermissionOverride         │
+│  Product, Category, Supplier                            │
+│  RawMaterial, RawMaterialBatch, RawMaterialMovement     │
+│  Transaction, TransactionItem, TransactionPayment       │
+│  Order, OrderItem, Shift                                │
+│  CashFlow, CashFlowCategory                             │
+│  Setting, Notification, AuditLog, BusinessInfo          │
+│  DiningTable, ExpenseCategory, Expense                  │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│  RELASI PERSENTASE                                      │
+├─────────────────────────────────────────────────────────┤
+│  Product         → Category (1:N)                       │
+│  Product         → TransactionItem, OrderItem           │
+│  RawMaterial     → RawMaterialBatch (1:N)               │
+│  RawMaterial     → RawMaterialMovement (1:N)            │
+│  RawMaterialBatch → RawMaterialMovement (1:N)           │
+│  Supplier        → RawMaterialBatch, RawMaterialMovement│
+│  Transaction     → TransactionItem, TransactionPayment  │
+│  Order           → OrderItem                            │
+│  Shift           → Transaction                          │
+│  User            → Shift, Transaction, CashFlow         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
 <div align="center">
-  <p><strong>BertigaPos v2.0</strong> — Dibangun dengan Next.js 15, Prisma, dan PostgreSQL</p>
+  <p><strong>BertigaPos v3.0</strong> — Dibangun dengan Next.js 16, Prisma, dan PostgreSQL</p>
 </div>
