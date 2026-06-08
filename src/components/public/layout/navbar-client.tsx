@@ -40,7 +40,7 @@ export default function NavbarClient({ isLoggedIn }: NavbarClientProps) {
       <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" onClick={closeMenu} className="flex items-center">
           <Image
-            src="/images/logo-bertigaaa-pos-horizontal.png"
+            src="/logo-bertigaaa-pos-horizontal.png"
             alt="BerTigaaa POS"
             width={220}
             height={74}

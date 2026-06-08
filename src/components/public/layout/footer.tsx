@@ -68,7 +68,7 @@ export default function Footer() {
           <div>
             <Link href="/" className="inline-flex items-center">
               <Image
-                src="/images/logo-bertigaaa-pos-horizontal.png"
+                src="/logo-bertigaaa-pos-horizontal.png"
                 alt="BerTigaaa POS"
                 width={220}
                 height={74}
