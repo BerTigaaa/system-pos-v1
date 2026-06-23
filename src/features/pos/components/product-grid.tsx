@@ -81,8 +81,7 @@ export function ProductGrid() {
               <button
                 key={p.id}
                 onClick={() => addItem(p)}
-                disabled={p.stock <= 0}
-                className="group relative flex flex-col rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 text-left disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none overflow-hidden"
+                className="group relative flex flex-col rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 text-left overflow-hidden"
               >
                 <div className="aspect-square bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center relative overflow-hidden">
                   {p.imageUrl ? (
@@ -98,18 +97,6 @@ export function ProductGrid() {
                     </span>
                   )}
                   <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white/60 dark:from-gray-900/60 to-transparent" />
-                  {p.stock > 0 && p.stock <= 3 && (
-                    <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-amber-400 border-2 border-white dark:border-gray-900 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
-                      {p.stock}
-                    </span>
-                  )}
-                  {p.stock === 0 && (
-                    <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 backdrop-blur-[1px] flex items-center justify-center">
-                      <span className="text-[11px] font-semibold text-red-500 bg-red-50 dark:bg-red-950 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                        Habis
-                      </span>
-                    </div>
-                  )}
                 </div>
                 <div className="p-3 space-y-1">
                   <p className="text-[13px] font-medium text-gray-900 dark:text-white truncate leading-snug">
@@ -118,9 +105,6 @@ export function ProductGrid() {
                   <p className="text-[11px] text-gray-400 truncate font-mono">{p.sku}</p>
                   <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
                     Rp {p.sellPrice.toLocaleString("id")}
-                  </p>
-                  <p className="text-[10px] text-gray-300 dark:text-gray-600">
-                    Stok: {p.stock} {p.unit}
                   </p>
                 </div>
               </button>

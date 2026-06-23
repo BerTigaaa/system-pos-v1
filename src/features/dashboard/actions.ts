@@ -18,7 +18,7 @@ export async function getDashboardStats() {
   const role = session.user.role;
   const cashierFilter = role === "CASHIER" ? { cashierId: session.user.id } : {};
 
-  const [todayTransactions, todaySalesAgg, totalProducts, lowStockProducts] =
+  const [todayTransactions, todaySalesAgg, totalProducts, lowStockRawMaterials] =
     await Promise.all([
       prisma.transaction.count({
         where: { createdAt: { gte: today, lt: tomorrow }, ...cashierFilter },
@@ -28,8 +28,8 @@ export async function getDashboardStats() {
         _sum: { total: true },
       }),
       prisma.product.count({ where: { deletedAt: null, isActive: true } }),
-      prisma.$queryRawUnsafe<{ id: string; name: string; sku: string; stock: number; min_stock: number }[]>(
-        `SELECT id, name, sku, stock, min_stock FROM products WHERE deleted_at IS NULL AND is_active = true AND stock <= min_stock ORDER BY stock ASC LIMIT 10`
+      prisma.$queryRawUnsafe<{ id: string; name: string; sku: string; stock: number; minStock: number; unit: string }[]>(
+        `SELECT id, name, sku, stock, "minStock", unit FROM raw_materials WHERE deleted_at IS NULL AND is_active = true AND stock <= "minStock" ORDER BY stock ASC LIMIT 10`
       ),
     ]);
 
@@ -43,7 +43,7 @@ export async function getDashboardStats() {
       totalSales,
       avgTransaction,
       totalProducts,
-      lowStockList: lowStockProducts,
+      lowStockList: lowStockRawMaterials,
     },
   };
 }

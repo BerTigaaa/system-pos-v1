@@ -8,7 +8,6 @@ export type CartItem = {
   quantity: number;
   subtotal: number;
   discountAmount: number;
-  stock: number;
 };
 
 export type PosProduct = {
@@ -16,7 +15,6 @@ export type PosProduct = {
   name: string;
   sku: string;
   sellPrice: number;
-  stock: number;
   imageUrl: string | null;
   categoryName: string | null;
   unit: string;
@@ -55,11 +53,7 @@ export const useCartStore = create<CartState>((set) => ({
         return {
           items: state.items.map((i) =>
             i.productId === product.id
-              ? {
-                  ...i,
-                  quantity: Math.min(i.quantity + 1, i.stock),
-                  subtotal: Math.min(i.quantity + 1, i.stock) * i.sellPrice - i.discountAmount,
-                }
+              ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.sellPrice - i.discountAmount }
               : i
           ),
         };
@@ -75,7 +69,6 @@ export const useCartStore = create<CartState>((set) => ({
             quantity: 1,
             subtotal: Number(product.sellPrice),
             discountAmount: 0,
-            stock: product.stock,
           },
         ],
       };
@@ -87,7 +80,7 @@ export const useCartStore = create<CartState>((set) => ({
         ? state.items.filter((i) => i.productId !== productId)
         : state.items.map((i) =>
             i.productId === productId
-              ? { ...i, quantity: Math.min(qty, i.stock), subtotal: Math.min(qty, i.stock) * i.sellPrice - i.discountAmount }
+              ? { ...i, quantity: qty, subtotal: qty * i.sellPrice - i.discountAmount }
               : i
           ),
     })),

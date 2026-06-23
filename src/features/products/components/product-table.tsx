@@ -54,16 +54,33 @@ export function ProductTable() {
       dataIndex: "imageUrl",
       key: "image",
       width: 52,
-      render: (v: string | null) => (
-        <Image
-          src={v ?? ""}
-          alt=""
-          width={36}
-          height={36}
-          style={{ objectFit: "cover", borderRadius: 6 }}
-          fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHZpZXdCb3g9IjAgMCAzNiAzNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIGZpbGw9IiNGMUYxRjEiLz48dGV4dCB4PSIxOCIgeT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTkiIGZvbnQtc2l6ZT0iMTAiPk5vIEltZzwvdGV4dD48L3N2Zz4="
-        />
-      ),
+      render: (v: string | null) =>
+        v ? (
+          <Image
+            src={v}
+            alt=""
+            width={36}
+            height={36}
+            style={{ objectFit: "cover", borderRadius: 6 }}
+            fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHZpZXdCb3g9IjAgMCAzNiAzNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIGZpbGw9IiNGMUYxRjEiLz48dGV4dCB4PSIxOCIgeT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTkiIGZvbnQtc2l6ZT0iMTAiPk5vIEltZzwvdGV4dD48L3N2Zz4="
+          />
+        ) : (
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 6,
+              background: "#f1f1f1",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              color: "#999",
+            }}
+          >
+            No Img
+          </div>
+        ),
     },
     {
       title: "Nama",
@@ -89,16 +106,6 @@ export function ProductTable() {
       key: "sellPrice",
       width: 130,
       render: (v: number) => `Rp ${Number(v).toLocaleString("id")}`,
-    },
-    {
-      title: "Stok",
-      dataIndex: "stock",
-      key: "stock",
-      width: 80,
-      render: (v: number, r: ProductWithCategory) => {
-        const low = v <= r.minStock;
-        return <span className={low ? "text-red-500 font-semibold" : ""}>{v}</span>;
-      },
     },
     {
       title: "Status",

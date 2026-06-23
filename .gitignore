@@ -38,3 +38,7 @@ next-env.d.ts
 # project specific
 /files
 /plan
+
+# uploaded product images
+/public/products/*
+!/public/products/.gitkeep

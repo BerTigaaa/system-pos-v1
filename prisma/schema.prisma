@@ -52,6 +52,13 @@ enum CashFlowType {
   OUT
 }
 
+enum RawMaterialMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  OPNAME
+}
+
 enum ShiftStatus {
   OPEN
   CLOSED
@@ -85,29 +92,30 @@ enum NotificationType {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  name          String
-  email         String        @unique
-  password      String
-  role          UserRole
-  phone         String?
-  avatarUrl     String?       @map("avatar_url")
-  isActive      Boolean       @default(true) @map("is_active")
-  status        AccountStatus @default(TRIAL)
-  trialStartDate DateTime?    @map("trial_start_date")
-  trialEndDate  DateTime?     @map("trial_end_date")
-  lastLoginAt   DateTime?     @map("last_login_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id             String        @id @default(uuid())
+  name           String
+  email          String        @unique
+  password       String
+  role           UserRole
+  phone          String?
+  avatarUrl      String?       @map("avatar_url")
+  isActive       Boolean       @default(true) @map("is_active")
+  status         AccountStatus @default(TRIAL)
+  trialStartDate DateTime?     @map("trial_start_date")
+  trialEndDate   DateTime?     @map("trial_end_date")
+  lastLoginAt    DateTime?     @map("last_login_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  transactions  Transaction[] @relation("CashierTransactions")
-  shifts        Shift[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
-  inventoryMovements InventoryMovement[]
-  cashFlows     CashFlow[]
-  stockOpnames  StockOpname[]
-  processedRefunds Refund[]
+  transactions         Transaction[]         @relation("CashierTransactions")
+  shifts               Shift[]
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+  inventoryMovements   InventoryMovement[]
+  cashFlows            CashFlow[]
+  stockOpnames         StockOpname[]
+  processedRefunds     Refund[]
+  rawMaterialMovements RawMaterialMovement[]
 
   @@index([email])
   @@map("users")
@@ -124,18 +132,18 @@ model RolePermission {
 }
 
 model BusinessInfo {
-  id          String   @id @default(uuid())
-  name        String
-  ownerName   String   @map("owner_name")
-  address     String?
-  phone       String?
-  email       String?
-  logoUrl     String?  @map("logo_url")
-  npwp        String?
-  selfOrderEnabled Boolean @default(false) @map("self_order_enabled")
-  totalTables Int     @default(0) @map("total_tables")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  name             String
+  ownerName        String   @map("owner_name")
+  address          String?
+  phone            String?
+  email            String?
+  logoUrl          String?  @map("logo_url")
+  npwp             String?
+  selfOrderEnabled Boolean  @default(false) @map("self_order_enabled")
+  totalTables      Int      @default(0) @map("total_tables")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   diningTables DiningTable[]
 
@@ -143,18 +151,18 @@ model BusinessInfo {
 }
 
 model DiningTable {
-  id          String   @id @default(uuid())
-  businessInfoId String @map("business_info_id")
-  tableNumber Int      @map("table_number")
-  label       String   @default("")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  businessInfoId String   @map("business_info_id")
+  tableNumber    Int      @map("table_number")
+  label          String   @default("")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   businessInfo BusinessInfo @relation(fields: [businessInfoId], references: [id], onDelete: Cascade)
 
-  @@index([businessInfoId])
   @@unique([businessInfoId, tableNumber])
+  @@index([businessInfoId])
   @@map("dining_tables")
 }
 
@@ -166,34 +174,32 @@ model Category {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  products    Product[]
+  products Product[]
 
   @@map("categories")
 }
 
 model Product {
-  id           String   @id @default(uuid())
-  categoryId   String?  @map("category_id")
-  name         String
-  sku          String   @unique
-  barcode      String?  @unique
-  description  String?
-  imageUrl     String?  @map("image_url")
-  unit         String   @default("pcs")
-  buyPrice     Decimal  @default(0) @map("buy_price") @db.Decimal(12, 2)
+  id          String    @id @default(uuid())
+  categoryId  String?   @map("category_id")
+  name        String
+  sku         String    @unique
+  barcode     String?   @unique
+  description String?
+  imageUrl    String?   @map("image_url")
+  unit        String    @default("pcs")
+  buyPrice    Decimal   @default(0) @map("buy_price") @db.Decimal(12, 2)
   sellPrice    Decimal  @map("sell_price") @db.Decimal(12, 2)
-  stock        Int      @default(0)
-  minStock     Int      @default(5) @map("min_stock")
   isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
-  category          Category?          @relation(fields: [categoryId], references: [id])
-  transactionItems  TransactionItem[]
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  transactionItems   TransactionItem[]
   inventoryMovements InventoryMovement[]
-  stockOpnameItems  StockOpnameItem[]
-  orderItems        OrderItem[]
+  stockOpnameItems   StockOpnameItem[]
+  orderItems         OrderItem[]
 
   @@index([isActive])
   @@index([categoryId])
@@ -201,43 +207,118 @@ model Product {
 }
 
 model Supplier {
-  id          String   @id @default(uuid())
-  name        String
-  phone       String?
-  email       String?
-  address     String?
-  notes       String?
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  inventoryMovements  InventoryMovement[]
+  inventoryMovements   InventoryMovement[]
+  rawMaterialBatches   RawMaterialBatch[]
+  rawMaterialMovements RawMaterialMovement[]
 
   @@map("suppliers")
 }
 
+// ============================================================
+// RAW MATERIALS (Bahan Baku)
+// ============================================================
 
+model RawMaterial {
+  id        String    @id @default(uuid())
+  name      String
+  sku       String    @unique
+  category  String?
+  unit      String    @default("pcs")
+  stock     Int       @default(0)
+  minStock  Int       @default(0)
+  buyPrice  Decimal   @default(0) @db.Decimal(12, 2)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  batches   RawMaterialBatch[]
+  movements RawMaterialMovement[]
+
+  @@index([isActive])
+  @@index([category])
+  @@map("raw_materials")
+}
+
+model RawMaterialBatch {
+  id            String    @id @default(uuid())
+  rawMaterialId String    @map("raw_material_id")
+  batchCode     String?   @map("batch_code")
+  quantity      Int       @default(0)
+  buyPrice      Decimal   @db.Decimal(12, 2)
+  expiryDate    DateTime? @map("expiry_date")
+  receivedDate  DateTime  @default(now()) @map("received_date")
+  supplierId    String?   @map("supplier_id")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  rawMaterial          RawMaterial           @relation(fields: [rawMaterialId], references: [id])
+  supplier             Supplier?             @relation(fields: [supplierId], references: [id])
+  rawMaterialMovements RawMaterialMovement[]
+
+  @@index([rawMaterialId])
+  @@index([expiryDate])
+  @@index([supplierId])
+  @@map("raw_material_batches")
+}
+
+model RawMaterialMovement {
+  id            String                  @id @default(uuid())
+  rawMaterialId String                  @map("raw_material_id")
+  userId        String                  @map("user_id")
+  supplierId    String?                 @map("supplier_id")
+  type          RawMaterialMovementType
+  quantity      Int
+  stockBefore   Int                     @map("stock_before")
+  stockAfter    Int                     @map("stock_after")
+  buyPrice      Decimal?                @map("buy_price") @db.Decimal(12, 2)
+  batchId       String?                 @map("batch_id")
+  reason        String?
+  notes         String?
+  createdAt     DateTime                @default(now()) @map("created_at")
+
+  rawMaterial RawMaterial       @relation(fields: [rawMaterialId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+  supplier    Supplier?         @relation(fields: [supplierId], references: [id])
+  batch       RawMaterialBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([rawMaterialId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([batchId])
+  @@map("raw_material_movements")
+}
 
 model Shift {
-  id              String      @id @default(uuid())
-  userId          String      @map("user_id")
-  status          ShiftStatus @default(OPEN)
-  openingBalance  Decimal     @default(0) @map("opening_balance") @db.Decimal(12, 2)
-  closingBalance  Decimal?    @map("closing_balance") @db.Decimal(12, 2)
-  totalCash       Decimal     @default(0) @map("total_cash") @db.Decimal(12, 2)
-  totalQris       Decimal     @default(0) @map("total_qris") @db.Decimal(12, 2)
-  totalTransfer   Decimal     @default(0) @map("total_transfer") @db.Decimal(12, 2)
-  totalCard       Decimal     @default(0) @map("total_card") @db.Decimal(12, 2)
-  totalSales      Decimal     @default(0) @map("total_sales") @db.Decimal(12, 2)
-  totalTransactions Int       @default(0) @map("total_transactions")
-  openedAt        DateTime    @default(now()) @map("opened_at")
-  closedAt        DateTime?   @map("closed_at")
-  notes           String?
-  createdAt       DateTime    @default(now()) @map("created_at")
+  id                String      @id @default(uuid())
+  userId            String      @map("user_id")
+  status            ShiftStatus @default(OPEN)
+  openingBalance    Decimal     @default(0) @map("opening_balance") @db.Decimal(12, 2)
+  closingBalance    Decimal?    @map("closing_balance") @db.Decimal(12, 2)
+  totalCash         Decimal     @default(0) @map("total_cash") @db.Decimal(12, 2)
+  totalQris         Decimal     @default(0) @map("total_qris") @db.Decimal(12, 2)
+  totalTransfer     Decimal     @default(0) @map("total_transfer") @db.Decimal(12, 2)
+  totalCard         Decimal     @default(0) @map("total_card") @db.Decimal(12, 2)
+  totalSales        Decimal     @default(0) @map("total_sales") @db.Decimal(12, 2)
+  totalTransactions Int         @default(0) @map("total_transactions")
+  openedAt          DateTime    @default(now()) @map("opened_at")
+  closedAt          DateTime?   @map("closed_at")
+  notes             String?
+  createdAt         DateTime    @default(now()) @map("created_at")
 
-  user          User          @relation(fields: [userId], references: [id])
-  transactions  Transaction[]
-  orders        Order[]
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+  orders       Order[]
 
   @@index([userId, status])
   @@index([openedAt])
@@ -245,27 +326,27 @@ model Shift {
 }
 
 model Transaction {
-  id              String            @id @default(uuid())
-  invoiceNumber   String            @unique @map("invoice_number")
-  shiftId         String?           @map("shift_id")
-  cashierId       String            @map("cashier_id")
-  customerName    String?           @map("customer_name")
-  status          TransactionStatus @default(COMPLETED)
-  subtotal        Decimal           @db.Decimal(12, 2)
-  discountAmount  Decimal           @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  taxPercent      Decimal           @default(0) @map("tax_percent") @db.Decimal(5, 2)
-  taxAmount       Decimal           @default(0) @map("tax_amount") @db.Decimal(12, 2)
-  total           Decimal           @db.Decimal(12, 2)
-  notes           String?
-  tableNumber     Int?              @map("table_number")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
+  id             String            @id @default(uuid())
+  invoiceNumber  String            @unique @map("invoice_number")
+  shiftId        String?           @map("shift_id")
+  cashierId      String            @map("cashier_id")
+  customerName   String?           @map("customer_name")
+  status         TransactionStatus @default(COMPLETED)
+  subtotal       Decimal           @db.Decimal(12, 2)
+  discountAmount Decimal           @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  taxPercent     Decimal           @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  taxAmount      Decimal           @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total          Decimal           @db.Decimal(12, 2)
+  notes          String?
+  tableNumber    Int?              @map("table_number")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  shift             Shift?             @relation(fields: [shiftId], references: [id])
-  cashier           User               @relation("CashierTransactions", fields: [cashierId], references: [id])
-  items             TransactionItem[]
-  payments          TransactionPayment[]
-  refunds           Refund[]
+  shift    Shift?               @relation(fields: [shiftId], references: [id])
+  cashier  User                 @relation("CashierTransactions", fields: [cashierId], references: [id])
+  items    TransactionItem[]
+  payments TransactionPayment[]
+  refunds  Refund[]
 
   @@index([cashierId])
   @@index([createdAt])
@@ -275,21 +356,21 @@ model Transaction {
 }
 
 model TransactionItem {
-  id            String   @id @default(uuid())
-  transactionId String   @map("transaction_id")
-  productId     String   @map("product_id")
-  productName   String   @map("product_name")
-  productSku    String   @map("product_sku")
-  buyPrice      Decimal  @map("buy_price") @db.Decimal(12, 2)
-  sellPrice     Decimal  @map("sell_price") @db.Decimal(12, 2)
-  quantity      Int
-  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  subtotal      Decimal  @db.Decimal(12, 2)
-  createdAt     DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  transactionId  String   @map("transaction_id")
+  productId      String   @map("product_id")
+  productName    String   @map("product_name")
+  productSku     String   @map("product_sku")
+  buyPrice       Decimal  @map("buy_price") @db.Decimal(12, 2)
+  sellPrice      Decimal  @map("sell_price") @db.Decimal(12, 2)
+  quantity       Int
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  subtotal       Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  product       Product      @relation(fields: [productId], references: [id])
-  refundItems   RefundItem[]
+  transaction Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  product     Product      @relation(fields: [productId], references: [id])
+  refundItems RefundItem[]
 
   @@index([transactionId])
   @@index([productId])
@@ -297,32 +378,32 @@ model TransactionItem {
 }
 
 model TransactionPayment {
-  id              String        @id @default(uuid())
-  transactionId   String        @map("transaction_id")
-  method          PaymentMethod
-  amount          Decimal       @db.Decimal(12, 2)
-  reference       String?
-  changeAmount    Decimal       @default(0) @map("change_amount") @db.Decimal(12, 2)
-  createdAt       DateTime      @default(now()) @map("created_at")
+  id            String        @id @default(uuid())
+  transactionId String        @map("transaction_id")
+  method        PaymentMethod
+  amount        Decimal       @db.Decimal(12, 2)
+  reference     String?
+  changeAmount  Decimal       @default(0) @map("change_amount") @db.Decimal(12, 2)
+  createdAt     DateTime      @default(now()) @map("created_at")
 
-  transaction     Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   @@index([transactionId])
   @@map("transaction_payments")
 }
 
 model Refund {
-  id              String   @id @default(uuid())
-  transactionId   String   @map("transaction_id")
-  refundNumber    String   @map("refund_number")
-  totalAmount     Decimal  @map("total_amount") @db.Decimal(12, 2)
-  reason          String
-  processedById   String   @map("processed_by_id")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  transactionId String   @map("transaction_id")
+  refundNumber  String   @map("refund_number")
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(12, 2)
+  reason        String
+  processedById String   @map("processed_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  transaction     Transaction  @relation(fields: [transactionId], references: [id])
-  processedBy     User         @relation(fields: [processedById], references: [id])
-  items           RefundItem[]
+  transaction Transaction  @relation(fields: [transactionId], references: [id])
+  processedBy User         @relation(fields: [processedById], references: [id])
+  items       RefundItem[]
 
   @@index([transactionId])
   @@index([processedById])
@@ -330,15 +411,15 @@ model Refund {
 }
 
 model RefundItem {
-  id                  String   @id @default(uuid())
-  refundId            String   @map("refund_id")
-  transactionItemId   String   @map("transaction_item_id")
-  quantity            Int
-  amount              Decimal  @db.Decimal(12, 2)
-  createdAt           DateTime @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  refundId          String   @map("refund_id")
+  transactionItemId String   @map("transaction_item_id")
+  quantity          Int
+  amount            Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
 
-  refund              Refund          @relation(fields: [refundId], references: [id], onDelete: Cascade)
-  transactionItem     TransactionItem @relation(fields: [transactionItemId], references: [id])
+  refund          Refund          @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  transactionItem TransactionItem @relation(fields: [transactionItemId], references: [id])
 
   @@index([refundId])
   @@index([transactionItemId])
@@ -361,9 +442,9 @@ model InventoryMovement {
   notes         String?
   createdAt     DateTime              @default(now()) @map("created_at")
 
-  product   Product   @relation(fields: [productId], references: [id])
-  user      User      @relation(fields: [userId], references: [id])
-  supplier  Supplier? @relation(fields: [supplierId], references: [id])
+  product  Product   @relation(fields: [productId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
 
   @@index([productId])
   @@index([type])
@@ -374,32 +455,32 @@ model InventoryMovement {
 }
 
 model StockOpname {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  notes         String?
-  isAdjusted    Boolean  @default(false) @map("is_adjusted")
-  createdAt     DateTime @default(now()) @map("created_at")
-  adjustedAt    DateTime? @map("adjusted_at")
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  notes      String?
+  isAdjusted Boolean   @default(false) @map("is_adjusted")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  adjustedAt DateTime? @map("adjusted_at")
 
-  user          User             @relation(fields: [userId], references: [id])
-  items         StockOpnameItem[]
+  user  User              @relation(fields: [userId], references: [id])
+  items StockOpnameItem[]
 
   @@index([userId])
   @@map("stock_opnames")
 }
 
 model StockOpnameItem {
-  id            String      @id @default(uuid())
-  opnameId      String      @map("opname_id")
-  productId     String      @map("product_id")
-  systemStock   Int         @map("system_stock")
-  physicalStock Int         @map("physical_stock")
+  id            String   @id @default(uuid())
+  opnameId      String   @map("opname_id")
+  productId     String   @map("product_id")
+  systemStock   Int      @map("system_stock")
+  physicalStock Int      @map("physical_stock")
   difference    Int
   notes         String?
-  createdAt     DateTime    @default(now()) @map("created_at")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  opname        StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
-  product       Product     @relation(fields: [productId], references: [id])
+  opname  StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  product Product     @relation(fields: [productId], references: [id])
 
   @@index([opnameId])
   @@index([productId])
@@ -407,13 +488,13 @@ model StockOpnameItem {
 }
 
 model CashFlowCategory {
-  id          String       @id @default(uuid())
-  name        String
-  type        CashFlowType
-  isDefault   Boolean      @default(false) @map("is_default")
-  createdAt   DateTime     @default(now()) @map("created_at")
+  id        String       @id @default(uuid())
+  name      String
+  type      CashFlowType
+  isDefault Boolean      @default(false) @map("is_default")
+  createdAt DateTime     @default(now()) @map("created_at")
 
-  cashFlows   CashFlow[]
+  cashFlows CashFlow[]
 
   @@unique([name, type])
   @@map("cash_flow_categories")
@@ -432,8 +513,8 @@ model CashFlow {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   deletedAt   DateTime?    @map("deleted_at")
 
-  user        User             @relation(fields: [userId], references: [id])
-  category    CashFlowCategory @relation(fields: [categoryId], references: [id])
+  user     User             @relation(fields: [userId], references: [id])
+  category CashFlowCategory @relation(fields: [categoryId], references: [id])
 
   @@index([type])
   @@index([date])
@@ -464,7 +545,7 @@ model AuditLog {
   userAgent   String?  @map("user_agent")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([module])
   @@index([createdAt])
@@ -488,12 +569,12 @@ model Order {
   total        Decimal     @db.Decimal(12, 2)
 
   items   OrderItem[]
-  shiftId String?   @map("shift_id")
-  shift   Shift?    @relation(fields: [shiftId], references: [id])
+  shiftId String?     @map("shift_id")
+  shift   Shift?      @relation(fields: [shiftId], references: [id])
 
-  paidAt     DateTime? @map("paid_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  paidAt    DateTime? @map("paid_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([shiftId])
@@ -507,7 +588,7 @@ model OrderItem {
   productId   String  @map("product_id")
   productName String  @map("product_name")
   quantity    Int
-  sellPrice   Decimal @db.Decimal(12, 2) @map("sell_price")
+  sellPrice   Decimal @map("sell_price") @db.Decimal(12, 2)
   subtotal    Decimal @db.Decimal(12, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -519,17 +600,17 @@ model OrderItem {
 }
 
 model Notification {
-  id          String           @id @default(uuid())
-  userId      String           @map("user_id")
-  type        NotificationType
-  title       String
-  message     String
-  isRead      Boolean          @default(false) @map("is_read")
-  data        Json?
-  createdAt   DateTime         @default(now()) @map("created_at")
-  readAt      DateTime?        @map("read_at")
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false) @map("is_read")
+  data      Json?
+  createdAt DateTime         @default(now()) @map("created_at")
+  readAt    DateTime?        @map("read_at")
 
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isRead])

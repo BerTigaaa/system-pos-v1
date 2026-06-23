@@ -245,38 +245,22 @@ export async function processRefund(formData: RefundFormData) {
 
     const refundItemIds = items.map((i) => i.transactionItemId);
     const txItems = transaction.items.filter((ti) => refundItemIds.includes(ti.id));
-    const productIds = [...new Set(txItems.map((ti) => ti.productId))];
-    const products = await tx.product.findMany({
-      where: { id: { in: productIds } },
-      select: { id: true, stock: true },
-    });
-    const productStockMap = new Map(products.map((p) => [p.id, p.stock]));
-
     await Promise.all(
       items.map((item) => {
         const txItem = txItems.find((i) => i.id === item.transactionItemId)!;
-        const stockBefore = productStockMap.get(txItem.productId) ?? 0;
-        productStockMap.set(txItem.productId, stockBefore + item.quantity);
-        return tx.product.update({
-          where: { id: txItem.productId },
-          data: { stock: { increment: item.quantity } },
+        return tx.inventoryMovement.create({
+          data: {
+            productId: txItem.productId,
+            userId: session.user.id,
+            type: "RETURN" as const,
+            quantity: item.quantity,
+            stockBefore: 0,
+            stockAfter: 0,
+            notes: `Refund: ${refundNumber} - ${txItem.productName} x${item.quantity}`,
+          },
         });
       })
     );
-
-    const movements = items.map((item) => {
-      const txItem = txItems.find((i) => i.id === item.transactionItemId)!;
-      return {
-        productId: txItem.productId,
-        userId: session.user.id,
-        type: "RETURN" as InventoryMovementType,
-        quantity: item.quantity,
-        stockBefore: productStockMap.get(txItem.productId)! - item.quantity,
-        stockAfter: productStockMap.get(txItem.productId)!,
-        notes: `Refund: ${refundNumber} - ${txItem.productName} x${item.quantity}`,
-      };
-    });
-    await tx.inventoryMovement.createMany({ data: movements });
 
     await tx.auditLog.create({
       data: {

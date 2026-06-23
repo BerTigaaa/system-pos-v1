@@ -3,33 +3,32 @@
 import { useState, useEffect, useCallback } from "react";
 import { Select, Table, Tag, Spin } from "antd";
 import { getStockReport } from "../actions";
+import { getRawMaterialCategories } from "@/features/raw-materials/actions";
 import type { StockReportRow } from "../types";
 
 export function StockReport() {
   const [data, setData] = useState<StockReportRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoryId, setCategoryId] = useState<string>();
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [category, setCategory] = useState<string>();
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    import("@/features/products/actions").then((m) =>
-      m.getCategories().then((res) => {
-        if (res.success) setCategories(res.data as { id: string; name: string }[]);
-      })
-    );
+    getRawMaterialCategories().then((res) => {
+      if (res.success) setCategories(res.data);
+    });
   }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getStockReport(categoryId);
+      const res = await getStockReport(category);
       if (res.success) setData(res.data as StockReportRow[]);
     } catch (err) {
       console.error("Gagal memuat laporan stok:", err);
     } finally {
       setLoading(false);
     }
-  }, [categoryId]);
+  }, [category]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -40,7 +39,7 @@ export function StockReport() {
   };
 
   const columns = [
-    { title: "Produk", dataIndex: "name", key: "name" },
+    { title: "Bahan Baku", dataIndex: "name", key: "name" },
     { title: "SKU", dataIndex: "sku", key: "sku", width: 120 },
     {
       title: "Kategori",
@@ -75,12 +74,10 @@ export function StockReport() {
       render: (v: number) => `Rp ${v.toLocaleString("id")}`,
     },
     {
-      title: "Harga Jual",
-      dataIndex: "sellPrice",
-      key: "sellPrice",
-      width: 120,
-      align: "right" as const,
-      render: (v: number) => `Rp ${v.toLocaleString("id")}`,
+      title: "Satuan",
+      dataIndex: "unit",
+      key: "unit",
+      width: 80,
     },
     {
       title: "Status",
@@ -103,9 +100,9 @@ export function StockReport() {
           allowClear
           placeholder="Kategori"
           style={{ width: 160 }}
-          value={categoryId}
-          onChange={setCategoryId}
-          options={categories.map((c) => ({ label: c.name, value: c.id }))}
+          value={category}
+          onChange={setCategory}
+          options={categories.map((c) => ({ label: c, value: c }))}
         />
       </div>
       <Table

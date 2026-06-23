@@ -50,6 +50,7 @@ export type StockReportRow = {
   minStock: number;
   buyPrice: number;
   sellPrice: number;
+  unit: string;
   status: "in_stock" | "low" | "out";
 };
 

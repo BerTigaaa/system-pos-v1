@@ -18,6 +18,7 @@ import {
 } from "@ant-design/icons";
 import { useCartStore } from "../store";
 import { getAvailableTables } from "@/features/settings/actions";
+import { useToast } from "@/components/ui/toast";
 import { createPosOrder, getPosOrders, getCompletedOrdersByTable, getTablesWithCompletedOrders, updatePosOrderStatus, getPaidOrders } from "../actions";
 import { CheckoutModal } from "./checkout-modal";
 import { ReceiptModal } from "./receipt-modal";
@@ -45,6 +46,7 @@ type OrderData = {
 };
 
 export function CartPanel() {
+  const toast = useToast();
   const { items, customerName, discountPercent, tableNumber, removeItem, updateQuantity, setCustomerName, setDiscountPercent, setTableNumber, clearCart } = useCartStore();
   const [mode, setMode] = useState<Mode>("order");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -111,26 +113,35 @@ export function CartPanel() {
 
   const handleCreateOrder = async () => {
     if (!customerName.trim()) return;
-    if (!tableNumber || tableNumber === -1) return;
+    if (!tableNumber) return; // tableNumber 0 is invalid, -1 (Acak) is ok
     if (items.length === 0) return;
 
-    setSubmittingOrder(true);
-    const res = await createPosOrder({
-      tableNumber,
-      customerName: customerName.trim(),
-      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, sellPrice: i.sellPrice })),
-    });
-    setSubmittingOrder(false);
+    try {
+      setSubmittingOrder(true);
+      const res = await createPosOrder({
+        tableNumber,
+        customerName: customerName.trim(),
+        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, sellPrice: i.sellPrice })),
+      });
+      setSubmittingOrder(false);
 
-    if (res.success) {
-      clearCart();
-      setMode("list");
-      loadOrders();
+      if (res.success) {
+        clearCart();
+        setMode("list");
+        loadOrders();
+      } else {
+        toast.error(res.error?.message ?? "Gagal membuat pesanan");
+      }
+    } catch (err) {
+      setSubmittingOrder(false);
+      toast.error("Terjadi kesalahan jaringan");
+      console.error(err);
     }
   };
 
   const handleUpdateStatus = async (orderId: string, status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED") => {
-    await updatePosOrderStatus(orderId, status);
+    const res = await updatePosOrderStatus(orderId, status);
+    if (!res.success) toast.error(res.error?.message ?? "Gagal memperbarui status");
     loadOrders();
   };
 
@@ -269,7 +280,6 @@ export function CartPanel() {
                         </span>
                         <button
                           onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                          disabled={item.quantity >= item.stock}
                           className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs"
                         >
                           <PlusOutlined />

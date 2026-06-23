@@ -26,7 +26,7 @@ export async function getOrderProducts(params: { search?: string; categoryId?: s
   const products = await prisma.product.findMany({
     where,
     orderBy: { name: "asc" },
-    select: { id: true, name: true, sku: true, sellPrice: true, stock: true, unit: true, imageUrl: true, categoryId: true },
+    select: { id: true, name: true, sku: true, sellPrice: true, unit: true, imageUrl: true, categoryId: true },
   });
 
   return {
@@ -70,7 +70,7 @@ export async function createOrder(formData: FormData) {
   const productIds = [...new Set(items.map((i) => i.productId))];
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
-    select: { id: true, name: true, stock: true },
+    select: { id: true, name: true },
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
 
@@ -85,8 +85,8 @@ export async function createOrder(formData: FormData) {
 
   for (const item of items) {
     const product = productMap.get(item.productId);
-    if (!product || product.stock < item.quantity) {
-      return { success: false, error: { message: `Stok ${product?.name ?? "produk"} tidak mencukupi` } };
+    if (!product) {
+      return { success: false, error: { message: `Produk tidak ditemukan` } };
     }
     const subtotal = item.sellPrice * item.quantity;
     total += subtotal;
@@ -251,14 +251,6 @@ export async function confirmOrder(orderId: string) {
   if (order.status !== "PENDING") return { success: false, error: { message: "Order sudah diproses" } };
 
   await prisma.$transaction(async (tx) => {
-    await Promise.all(
-      order.items.map((item) =>
-        tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        })
-      )
-    );
     await tx.order.update({
       where: { id: orderId },
       data: { status: "CONFIRMED" },
