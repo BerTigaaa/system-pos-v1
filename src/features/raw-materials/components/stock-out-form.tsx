@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Form, Input, InputNumber, Select, Button, Card } from "antd";
 import { useToast } from "@/components/ui/toast";
 import { usePermissions } from "@/hooks/use-permissions";
+import { notifyInventoryUpdated } from "@/hooks/use-inventory-refresh";
 import { stockOut, getAllRawMaterials } from "../actions";
 
 export function StockOutForm() {
@@ -28,6 +29,7 @@ export function StockOutForm() {
     if (res.success) {
       toast.success("Stok keluar berhasil");
       form.resetFields();
+      notifyInventoryUpdated();
     } else {
       toast.error(res.error?.message ?? "Gagal");
     }

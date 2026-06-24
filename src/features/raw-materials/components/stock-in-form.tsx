@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Form, Input, InputNumber, Select, Button, Card, DatePicker } from "antd";
 import { useToast } from "@/components/ui/toast";
 import { usePermissions } from "@/hooks/use-permissions";
+import { notifyInventoryUpdated } from "@/hooks/use-inventory-refresh";
 import { stockIn, getAllRawMaterials } from "../actions";
 import { getSuppliers } from "@/features/suppliers/actions";
 import dayjs from "dayjs";
@@ -37,6 +38,7 @@ export function StockInForm() {
     if (res.success) {
       toast.success("Stok masuk berhasil");
       form.resetFields();
+      notifyInventoryUpdated();
     } else {
       toast.error(res.error?.message ?? "Gagal");
     }
@@ -69,7 +71,7 @@ export function StockInForm() {
         <Form.Item name="quantity" label="Jumlah" rules={[{ required: true, message: "Masukkan jumlah" }]}>
           <InputNumber className="w-full" min={1} placeholder="1" />
         </Form.Item>
-        <Form.Item name="buyPrice" label="Harga Beli">
+        <Form.Item name="buyPrice" label="Harga Beli (per satuan)">
           <InputNumber className="w-full" min={0} prefix="Rp" placeholder="0" />
         </Form.Item>
         <Form.Item name="expiryDate" label="Tanggal Kadaluwarsa (opsional)">
