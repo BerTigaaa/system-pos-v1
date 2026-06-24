@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Select, Tag, Table } from "antd";
 import { DataTable } from "@/components/ui/data-table";
+import { useInventoryRefresh } from "@/hooks/use-inventory-refresh";
 import { getRawMaterialMovements } from "../actions";
 import type { MovementItem } from "../types";
 
@@ -39,6 +40,7 @@ export function RawMaterialMovementList() {
   };
 
   useEffect(() => { load(); }, []);
+  useInventoryRefresh(() => load(page, search, type));
 
   const columns = [
     {

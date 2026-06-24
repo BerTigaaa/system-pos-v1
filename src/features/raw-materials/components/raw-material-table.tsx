@@ -7,6 +7,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { AppDrawer } from "@/components/ui/drawer";
 import { useToast } from "@/components/ui/toast";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useInventoryRefresh } from "@/hooks/use-inventory-refresh";
 import { getRawMaterials, deleteRawMaterial } from "../actions";
 import { RawMaterialForm } from "./raw-material-form";
 import type { RawMaterialWithStats } from "../types";
@@ -33,6 +34,7 @@ export function RawMaterialTable() {
   }, [page, search]);
 
   useEffect(() => { load(); }, [load]);
+  useInventoryRefresh(load);
 
   const handleDelete = async (id: string) => {
     const res = await deleteRawMaterial(id);

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Tag } from "antd";
 import { WarningOutlined } from "@ant-design/icons";
 import { DataTable } from "@/components/ui/data-table";
+import { useInventoryRefresh } from "@/hooks/use-inventory-refresh";
 import { getExpiringBatches } from "../actions";
 
 export function ExpiryWarning() {
@@ -18,6 +19,7 @@ export function ExpiryWarning() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useInventoryRefresh(load);
 
   const columns = [
     { title: "Bahan Baku", dataIndex: "rawMaterialName", key: "rawMaterialName" },
