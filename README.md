@@ -8,6 +8,7 @@
 ## Daftar Isi
 
 - [Cara Clone & Setup](#cara-clone--setup)
+- [Daftar Perintah](#daftar-perintah)
 - [Tech Stack](#tech-stack)
 - [Role & Hak Akses](#role--hak-akses)
 - [Halaman & Fitur](#halaman--fitur)
@@ -29,6 +30,9 @@
 - [Upload Foto Produk](#upload-foto-produk)
 - [Notifikasi](#notifikasi)
 - [Permission Matrix](#permission-matrix)
+- [Struktur Database](#struktur-database)
+- [Struktur Proyek](#struktur-proyek)
+- [Catatan & Batasan](#catatan--batasan)
 
 ---
 
@@ -68,10 +72,27 @@ Buka **http://localhost:3000** — login menggunakan akun seed:
 
 ---
 
+## Daftar Perintah
+
+| Perintah | Fungsi |
+|----------|--------|
+| `npm run dev` | Menjalankan dev server → http://localhost:3000 |
+| `npm run dev:network` | Dev server dengan akses jaringan (`-H 0.0.0.0`) |
+| `npm run build` | Build produksi |
+| `npm start` | Menjalankan hasil build |
+| `npm run lint` | Lint (Next.js lint) |
+| `npm run typecheck` | Type-check TypeScript (`tsc --noEmit`) |
+| `npm test` / `npm run test:watch` | Menjalankan test (vitest) |
+| `npm run seed:cafe` | Seed data demo cafe (`prisma/seed-cafe.ts`) |
+| `npx prisma migrate dev` | Menjalankan migrasi + regenerate Prisma client |
+| `npx prisma db seed` | Menjalankan seed utama |
+
+---
+
 ## Tech Stack
 
-- **Frontend:** Next.js 16 (App Router, Turbopack), TypeScript 5, TailwindCSS 3, Ant Design 5, Zustand 4, Recharts
-- **Backend:** Next.js Server Actions, Prisma ORM 5, PostgreSQL 16
+- **Frontend:** Next.js 16 (App Router, Turbopack), TypeScript 6, TailwindCSS 4, Ant Design 6, Zustand 5, Recharts 3
+- **Backend:** Next.js Server Actions, Prisma ORM 6, PostgreSQL 16
 - **Auth:** NextAuth v5 (Auth.js), bcryptjs, RBAC (hardcoded + DB override)
 - **Upload:** Local file storage (`public/products/`)
 - **Deploy:** Vercel / Railway / VPS
@@ -191,7 +212,7 @@ Ada **5 role** dengan akses berbeda:
 
 **Akses:** SUPER_ADMIN, OWNER, **WAREHOUSE**
 
-Halaman Gudang memiliki **6 tab**:
+Halaman Gudang memiliki **6 tab** (tabel otomatis refresh saat ada pergerakan stok via event bus):
 
 #### Tab 1: Bahan Baku
 **Tampilan:** Tabel bahan baku: nama, SKU, kategori, satuan, stok saat ini, stok minimum, harga beli, status
@@ -207,7 +228,7 @@ Halaman Gudang memiliki **6 tab**:
 **Aksi:**
 - Pilih bahan baku
 - Pilih supplier
-- Input: kode batch, jumlah, harga beli per batch, tanggal terima, tanggal kadaluwarsa (opsional)
+- Input: kode batch, jumlah, **harga beli per satuan**, tanggal terima, tanggal kadaluwarsa (opsional)
 - Batch otomatis menambah stok bahan baku
 
 #### Tab 3: Stok Keluar
@@ -221,7 +242,9 @@ Halaman Gudang memiliki **6 tab**:
 #### Tab 4: Riwayat Bahan Baku
 **Tampilan:** Riwayat semua pergerakan stok bahan baku
 
-**Filter:** Search nama, filter tipe (STOCK_IN / STOCK_OUT / ADJUSTMENT / OPNAME)
+**Filter:** Search nama, filter tipe (STOCK_IN / STOCK_OUT)
+
+> Tipe `ADJUSTMENT` / `OPNAME` ada di enum & label UI namun belum ada aksi yang membuatnya — lihat [Catatan & Batasan](#catatan--batasan).
 
 #### Tab 5: Kadaluwarsa
 **Tampilan:** Daftar batch yang akan expired dalam 14 hari ke depan
@@ -283,6 +306,8 @@ Halaman Gudang memiliki **6 tab**:
 **Filter:** Bulan & Tahun
 
 > **Catatan:** Keuangan (Kas Masuk/Kas Keluar) adalah catatan manual untuk aktivitas non-penjualan (sewa, gaji, modal, dll). TIDAK terikat dengan shift.
+>
+> **HPP & Laba Kotor** pada tab Rekap dihitung dari total `buyPrice × qty` transaksi COMPLETED pada periode tersebut (COGS dicatat saat checkout dari harga beli produk).
 
 ---
 
@@ -295,11 +320,12 @@ Halaman Gudang memiliki **6 tab**:
 | Penjualan Harian | Breakdown per jam + total — filter tanggal |
 | Penjualan Bulanan | Rekap bulanan — filter bulan & tahun |
 | Penjualan Tahunan | Rekap tahunan — filter tahun |
-| Produk Terlaris | Top produk — filter periode & kategori |
-| Stok Bahan Baku | Laporan stok bahan baku — filter kategori & status |
-| Aktivitas Kasir | Aktivitas per kasir — filter kasir, periode, shift |
+| Produk Terlaris | Top produk (qty, revenue, laba kotor) — filter periode & kategori |
+| Aktivitas Kasir | Aktivitas per kasir — filter kasir, periode |
 
 **Aksi:** Export Excel (.xlsx) & PDF (.pdf) di setiap tab.
+
+> **Catatan:** Kolom **Laba Kotor** di Produk Terlaris dihitung `Revenue − HPP`, dengan HPP memakai harga beli produk (`buyPrice`) yang dicatat saat checkout. Laporan **Stok Bahan Baku** sudah tersedia di backend (`getStockReport`) namun belum ditampilkan sebagai tab — lihat [Catatan & Batasan](#catatan--batasan).
 
 ---
 
@@ -551,6 +577,61 @@ Notifikasi dikirim otomatis dari **23 titik** di seluruh modul:
 
 ---
 
+## Struktur Proyek
+
+```
+src/
+├── app/                    # Halaman & routing (Next.js App Router)
+│   ├── (auth)/             # Halaman login
+│   ├── (landing)/          # Landing page publik
+│   └── (dashboard)/        # Halaman utama (dashboard, pos, produk, gudang, ...)
+├── components/
+│   ├── ui/                 # Komponen UI reusable (PageHeader, dsb.)
+│   └── public/             # Komponen landing page (animasi, dsb.)
+├── features/               # Modul per domain — pattern utama kode ini
+│   ├── <fitur>/actions.ts      # Server Actions (query + mutasi + RBAC)
+│   ├── <fitur>/components/     # Komponen milik modul
+│   └── <fitur>/types.ts        # Schema Zod + tipe TypeScript
+├── hooks/                  # Custom React hooks
+├── lib/                    # Helper & config (prisma.ts, auth.ts, dll.)
+├── store/                  # Global state (Zustand)
+├── proxy.ts                # Server proxy utility
+└── types/                  # Tipe global
+
+prisma/
+├── schema.prisma          # Skema database
+├── seed.ts                # Seed utama
+├── seed-cafe.ts           # Seed data demo cafe (npm run seed:cafe)
+└── migrations/            # Migrasi database
+```
+
+### Pola Server Action
+
+Semua query & mutasi data dilakukan lewat **Server Actions** di `src/features/<fitur>/actions.ts`. Setiap action diawali cek otorisasi:
+
+```ts
+const session = await auth();
+if (!session?.user?.id) return { success: false, error: { message: "Unauthorized" } };
+if (!await hasPermissionAsync(session.user.role, "reports", "view"))
+  return { success: false, error: { message: "Forbidden" } };
+```
+
+- Akses baca pakai aksi `view`, akses tulis pakai aksi `manage` (lihat `src/lib/*` & setup RBAC).
+- Response dikembalikan dalam bentuk `{ success: true, data }` atau `{ success: false, error }`.
+
+---
+
+## Catatan & Batasan (Known Limitations)
+
+- **`/forgot-password`** belum tersedia — link "Lupa password?" di halaman login masih menuju halaman 404.
+- **Laporan Stok Bahan Baku** belum tampil di halaman Laporan. Backend `getStockReport` dan komponen `stock-report.tsx` sudah ada, tapi tabnya belum dihubungkan.
+- **Riwayat Bahan Baku** hanya mencatat tipe `STOCK_IN` dan `STOCK_OUT` — tipe `ADJUSTMENT` / `OPNAME` ada di enum & label UI, tapi belum ada aksi yang membuat movement tersebut.
+- **Produk bersifat display-only** — stok produk tidak pernah didecrement saat transaksi. Transaksi sebelum dukungan COGS mencatat `buyPrice: 0`; koreksi/backfill data lama perlu dilakukan manual bila HPP dibutuhkan.
+- **Test otomatis (vitest)** sudah dikonfigurasi di `package.json`, namun belum ada file test yang ditulis (`npm test` berjalan tetapi tanpa test case).
+- **Upload foto produk** disimpan di `public/products/` (di-`.gitignore`). Untuk production, disarankan migrasi ke penyimpanan cloud (Cloudflare R2 / S3, env `CLOUDFLARE_*` sudah disiapkan).
+
+---
+
 <div align="center">
-  <p><strong>BertigaPos v3.0</strong> — Dibangun dengan Next.js 16, Prisma, dan PostgreSQL</p>
+  <p><strong>BertigaPos v0.1.0</strong> — Dibangun dengan Next.js 16, Prisma, dan PostgreSQL</p>
 </div>

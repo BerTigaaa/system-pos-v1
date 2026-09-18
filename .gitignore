@@ -39,6 +39,9 @@ next-env.d.ts
 /files
 /plan
 
+# playwright MCP test artifacts
+/.playwright-mcp
+
 # uploaded product images
 /public/products/*
 !/public/products/.gitkeep
