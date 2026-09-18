@@ -31,7 +31,7 @@ const featureCards = [
   {
     title: "Dashboard Bisnis",
     description:
-      "Pantau penjualan hari ini, transaksi, rata-rata transaksi, stok menipis, dan grafik penjualan 7 hari.",
+      "Pantau penjualan hari ini, transaksi, rata-rata transaksi, stok bahan baku menipis, dan grafik penjualan 7 hari.",
     icon: LayoutDashboard,
   },
   {
@@ -49,13 +49,13 @@ const featureCards = [
   {
     title: "Produk & Kategori",
     description:
-      "Tambah produk, SKU, barcode, gambar, kategori, harga beli, harga jual, stok, dan status produk.",
+      "Tambah produk, SKU, barcode, gambar, kategori, harga jual, dan status produk.",
     icon: Package,
   },
   {
     title: "Gudang & Stok",
     description:
-      "Pantau riwayat pergerakan stok, pembelian, manual keluar, adjustment, opname, dan retur.",
+      "Pantau stok bahan baku, stok masuk, stok keluar, batch, tanggal kadaluwarsa, dan supplier.",
     icon: Warehouse,
   },
   {
@@ -79,7 +79,7 @@ const featureCards = [
   {
     title: "Laporan",
     description:
-      "Export laporan penjualan harian, bulanan, tahunan, produk terlaris, stok barang, dan aktivitas kasir.",
+      "Export laporan penjualan harian, bulanan, tahunan, produk terlaris, stok bahan baku, dan aktivitas kasir.",
     icon: FileSpreadsheet,
   },
   {
@@ -97,7 +97,7 @@ const featureCards = [
   {
     title: "Notifikasi",
     description:
-      "Terima notifikasi stok menipis, pesanan baru, refund, perubahan data, login baru, dan aktivitas penting.",
+      "Terima notifikasi stok bahan baku menipis, pesanan baru, refund, perubahan data, login baru, dan aktivitas penting.",
     icon: Bell,
   },
 ];
@@ -120,7 +120,7 @@ const roles = [
   {
     role: "Warehouse",
     description:
-      "Kelola produk, stok, gudang, supplier, dan pergerakan inventori.",
+      "Kelola bahan baku, stok masuk/keluar, supplier, dan pergerakan inventori.",
   },
   {
     role: "Finance",
@@ -138,7 +138,7 @@ const steps = [
   {
     title: "Tambah Produk",
     description:
-      "Input produk, kategori, harga, stok, barcode, supplier, dan minimum stok.",
+      "Input produk, kategori, harga, barcode, dan status.",
   },
   {
     title: "Mulai Transaksi",
@@ -171,7 +171,7 @@ const faqs = [
   {
     question: "Apakah ada fitur stok menipis?",
     answer:
-      "Ada. Sistem memberi notifikasi ketika stok produk mendekati minimum atau habis.",
+      "Ada. Sistem memberi notifikasi ketika stok bahan baku mendekati minimum atau habis.",
   },
 ];
 

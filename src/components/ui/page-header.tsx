@@ -1,9 +1,7 @@
 "use client";
 
-import { Typography, Breadcrumb, Space } from "antd";
+import { Breadcrumb, Space } from "antd";
 import type { BreadcrumbProps } from "antd";
-
-const { Title } = Typography;
 
 export type PageHeaderProps = {
   title: string;
@@ -25,9 +23,9 @@ export function PageHeader({
       )}
       <div className="flex items-center justify-between">
         <Space orientation="vertical" size={0}>
-          <Title level={4} className="!mb-0">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {title}
-          </Title>
+          </h1>
           {subtitle && (
             <span className="text-gray-500 text-sm">{subtitle}</span>
           )}
