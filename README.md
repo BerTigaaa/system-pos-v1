@@ -1,6 +1,7 @@
 <div align="center">
   <h1>BertigaPos</h1>
   <p>Sistem POS (Point of Sale) modern untuk retail & UMKM — berbasis web, multi-role, real-time.</p>
+  <img src="pos.png" alt="Tampilan halaman POS BertigaPos" width="800" />
 </div>
 
 ---
