@@ -378,6 +378,12 @@ export async function checkout(data: {
     }
   }
 
+  const products = await prisma.product.findMany({
+    where: { id: { in: data.items.map((i) => i.productId) } },
+    select: { id: true, buyPrice: true },
+  });
+  const buyPriceMap = new Map(products.map((p) => [p.id, Number(p.buyPrice)]));
+
   const result = await prisma.$transaction(async (tx) => {
     const txData = {
       invoiceNumber,
@@ -404,7 +410,7 @@ export async function checkout(data: {
               productId: item.productId,
               productName: item.name ?? "",
               productSku: item.sku ?? "",
-              buyPrice: 0,
+              buyPrice: buyPriceMap.get(item.productId) ?? 0,
               sellPrice: item.sellPrice,
               quantity: item.quantity,
               discountAmount: item.discountAmount,
